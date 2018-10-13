@@ -155,6 +155,6 @@ class RadialBatch(ds.Batch):
         for comp, data in zip(components, zip(*results)):
             data = np.array(data + (None,))[:-1]
             if comp in ['rig_type', 'target']:
-                data = np.array(data)
+                data = np.array([d for d in data])
             setattr(self, comp, data)
         return self
