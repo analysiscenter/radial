@@ -25,7 +25,6 @@ class RadialBatch(ds.Batch):
     def __init__(self, index, preloaded=None):
         super().__init__(index, preloaded)
         self.time = self.array_of_nones
-        self.pressure = self.array_of_nones
         self.derivative = self.array_of_nones
         self.rig_type = self.array_of_nones
         self.target = self.array_of_nones
@@ -33,7 +32,7 @@ class RadialBatch(ds.Batch):
     @property
     def components(self):
         """tuple of str: Data components names."""
-        return "time", "pressure", "derivative", "rig_type", "target"
+        return "time", "derivative", "rig_type", "target"
 
     @property
     def array_of_nones(self):
@@ -130,7 +129,7 @@ class RadialBatch(ds.Batch):
 
         data = dict(np.load(path))
 
-        return [data[comp] if (comp in data.keys()) else None for comp in components]
+        return [data[comp] for comp in components]
 
 
     def _assemble_load(self, results, *args, **kwargs):

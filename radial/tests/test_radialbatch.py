@@ -37,10 +37,9 @@ def test_load(setup_module_load): #pylint: disable=redefined-outer-name
     ind = setup_module_load[0]
     batch = RadialBatch(ind)
     # Act
-    batch = batch.load(fmt="npz", components=["time", "pressure", "derivative", "rig_type", "target"])
+    batch = batch.load(fmt="npz", components=["time", "derivative", "rig_type", "target"])
     # Assert
     assert isinstance(batch.time, np.ndarray)
-    assert isinstance(batch.pressure, np.ndarray)
     assert isinstance(batch.derivative, np.ndarray)
     assert isinstance(batch.rig_type, np.ndarray)
     assert isinstance(batch.target, np.ndarray)
@@ -48,7 +47,5 @@ def test_load(setup_module_load): #pylint: disable=redefined-outer-name
     assert batch.rig_type.shape == (2,)
     assert batch.target.shape == (2,)
     assert isinstance(batch.derivative[0], np.ndarray)
-    assert isinstance(batch.pressure[0], np.ndarray)
-    assert batch.pressure[1] is None
     assert isinstance(batch.rig_type[0], str)
     del batch
