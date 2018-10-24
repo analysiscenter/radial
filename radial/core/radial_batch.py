@@ -12,14 +12,14 @@ class RadialBatch(ds.Batch):
     Parameters
     ----------
     index : DatasetIndex
-        Unique identifiers of ECGs in the batch.
+        Unique identifiers of rig data in the batch.
     preloaded : tuple, optional
         Data to put in the batch if given. Defaults to ``None``.
 
     Attributes
     ----------
     index : DatasetIndex
-        Unique identifiers of ECGs in the batch.
+        Unique identifiers of rig data in the batch.
     """
 
     def __init__(self, index, preloaded=None):
@@ -90,7 +90,7 @@ class RadialBatch(ds.Batch):
 
         Returns
         -------
-        batch : EcgBatch
+        batch : RadialBatch
             Batch with loaded components. Changes batch data inplace.
 
         Raises
