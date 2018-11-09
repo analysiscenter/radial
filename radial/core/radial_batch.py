@@ -76,6 +76,8 @@ class RadialBatch(ds.Batch):
         """
         if isinstance(components, str):
             components = list(components)
+        if components is None:
+            components = self.components
 
         return self._load(fmt, components)
 
@@ -156,8 +158,6 @@ class RadialBatch(ds.Batch):
         _ = args, kwargs
         self._reraise_exceptions(results)
         components = kwargs.get("components", None)
-        # import pdb
-        # pdb.set_trace()
         if components is None:
             components = self.components
         for comp, data in zip(components, zip(*results)):
@@ -257,7 +257,6 @@ class RadialBatch(ds.Batch):
 
         self.time[i] = np.array(sample_times)
         self.derivative[i] = np.array(sample_derivatives)
-
         return self
 
     @ds.action
@@ -311,6 +310,39 @@ class RadialBatch(ds.Batch):
 
         return batch
 
-    # @ds.action
-    # @ds.inbatch_parallel(init="indices", target="threads")
-    # def log(self, src, dst)
+    @ds.action
+    @ds.inbatch_parallel(init="indices", post='_assemble_load', target="threads")
+    def delete_outliers(self, index):
+        """
+        Delete two types of outliers:
+        1. Items with negative derivative.
+        2. Item which have a large time difference between adjacent items and all subsequent items.
+
+        Returns
+        -------
+            Items without outliers
+        """
+        i = self.get_pos(None, 'time', index)
+        time = self.time[i]
+        derivative = self.derivative[i]
+
+        negative = np.where(derivative < 0)[0]
+        neighbors = np.diff(time)
+        mean_elems = np.array([neighbors[i]/np.mean(np.delete(neighbors, i)) for i in range(len(time)-1)])
+        outliers = np.where(mean_elems > 70)[0]
+        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else []
+
+        data = {}
+        data['time'] = np.delete(time, [*negative, *outliers])
+        data['derivative'] = np.delete(derivative, [*negative, *outliers])
+        return [data[comp] for comp in ['time', 'derivative']]
+
+    @ds.action
+    def create_points(self, n_points, component_name='time', components=['time', 'derivative']):
+        first_dim = getattr(self, components[0])
+        second_dim = getattr(self, components[1])
+        zip_data = zip(first_dim, second_dim)
+        data = np.array(list(map(lambda d: np.array([d[0],d[1]]).reshape(-1, n_points), zip_data)))
+        print(data.shape)
+        setattr(self, component_name, data)
+        return self
