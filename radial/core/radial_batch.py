@@ -76,6 +76,8 @@ class RadialBatch(ds.Batch):
         """
         if isinstance(components, str):
             components = list(components)
+        if components is None:
+            components = self.components
 
         return self._load(fmt, components)
 
@@ -156,8 +158,6 @@ class RadialBatch(ds.Batch):
         _ = args, kwargs
         self._reraise_exceptions(results)
         components = kwargs.get("components", None)
-        # import pdb
-        # pdb.set_trace()
         if components is None:
             components = self.components
         for comp, data in zip(components, zip(*results)):
@@ -169,15 +169,23 @@ class RadialBatch(ds.Batch):
 
     @ds.action
     @ds.inbatch_parallel(init="indices", target="threads")
-    def filter_positive(self, index):
+    def filter_negative(self, index):
         """
         Leaves only positive values.
+
+        Raises
+        ------
+        ValueError
+            If all values in derivative component are negative.
         """
         i = self.get_pos(None, 'time', index)
         time = self.time[i]
         derivative = self.derivative[i]
 
         mask = derivative > 0
+
+        if sum(mask) == 0:
+            raise ValueError("All values in derivative {} are negative!".format(index))
 
         self.time[i] = time[mask]
         self.derivative[i] = derivative[mask]
@@ -252,7 +260,7 @@ class RadialBatch(ds.Batch):
 
         tmin, tmax = np.min(time), np.max(time)
         sample_times = samples * (tmax - tmin) + tmin
-
+        sample_times.sort(axis=-1)
         sample_derivatives = interpolater(sample_times)
 
         self.time[i] = np.array(sample_times)
