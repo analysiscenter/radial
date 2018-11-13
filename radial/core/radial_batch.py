@@ -3,9 +3,39 @@
 import numpy as np
 import scipy as sc
 
-from .. import dataset as ds
+from .. import batchflow as bf
 
-class RadialBatch(ds.Batch):
+
+def concatenate_points(batch, model, return_targets=True):
+    """Make data function that leads the data to the type required
+    for network training.
+
+    Parameters
+    ----------
+    batch : Dataset batch
+        Part of input data.
+    model : Dataset model
+        The model to train.
+    retrun_targets : bool
+        If ``True``, targets shape will be changed from ``(1,)`` to ``(-1, 1)``
+        targerts won't returned in another case.
+
+    Returns
+    -------
+    res_dict : dict
+        feed dict with inputs and targets (if needed).
+    """
+    _ = model
+    zip_data = zip(batch.time, batch.derivative)
+    points = np.array(list(map(lambda d: np.array([d[0], d[1]])\
+                .reshape(-1, batch.derivative[0].shape[1]), zip_data)))
+    res_dict = {'feed_dict': {'points': points}}
+    if return_targets:
+        y = batch.target.reshape(-1, 1)
+        res_dict['feed_dict']['targets'] = y
+    return res_dict
+
+class RadialBatch(bf.Batch):
     """
     Batch class that stores multiple time series along with other parameters
     for radial flow regime regression.
@@ -52,11 +82,11 @@ class RadialBatch(ds.Batch):
         RuntimeError
             If any paralleled action raised an ``Exception``.
         """
-        if ds.any_action_failed(results):
+        if bf.any_action_failed(results):
             all_errors = self.get_errors(results)
             raise RuntimeError("Cannot assemble the batch", all_errors)
 
-    @ds.action
+    @bf.action
     def load(self, fmt=None, components=None, *args, **kwargs):
         """Load given batch components.
 
@@ -81,7 +111,7 @@ class RadialBatch(ds.Batch):
 
         return self._load(fmt, components)
 
-    @ds.inbatch_parallel(init="indices", post="_assemble_load", target="threads")
+    @bf.inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
         """
         Load given components from file.
@@ -105,7 +135,7 @@ class RadialBatch(ds.Batch):
         """
         loaders = {'npz': self._load_npz}
 
-        if isinstance(self.index, ds.FilesIndex):
+        if isinstance(self.index, bf.FilesIndex):
             path = self.index.get_fullpath(indice)  # pylint: disable=no-member
         else:
             raise ValueError("Source path is not specified")
@@ -192,8 +222,8 @@ class RadialBatch(ds.Batch):
 
         return self
 
-    @ds.action
-    @ds.inbatch_parallel(init="indices", target="threads")
+    @bf.action
+    @bf.inbatch_parallel(init="indices", target="threads")
     def get_samples(self, index, n_points, n_samples=1,
                     sampler=None, interpolate='linear', seed=None):
         """ Draws samples from the interpolation of time and derivative components.
@@ -250,8 +280,8 @@ class RadialBatch(ds.Batch):
         interpolater = sc.interpolate.interp1d(time, derivative, kind=interpolate,
                                                bounds_error=True, assume_sorted=True)
 
-        if  isinstance(sampler, ds.named_expr.R):
-            sampler = ds.R(sampler.name, **sampler.kwargs, size=(n_samples, n_points))
+        if  isinstance(sampler, bf.named_expr.R):
+            sampler = bf.R(sampler.name, **sampler.kwargs, size=(n_samples, n_points))
             samples = sampler.get()
         elif callable(sampler):
             samples = sampler(size=(n_samples, n_points))
@@ -261,14 +291,14 @@ class RadialBatch(ds.Batch):
         tmin, tmax = np.min(time), np.max(time)
         sample_times = samples * (tmax - tmin) + tmin
         sample_times.sort(axis=-1)
+
         sample_derivatives = interpolater(sample_times)
 
         self.time[i] = np.array(sample_times)
         self.derivative[i] = np.array(sample_derivatives)
-
         return self
 
-    @ds.action
+    @bf.action
     def unstack_samples(self):
         """Create a new batch in which each element of `time` and `derivative`
         along axis 0 is considered as a separate signal.
@@ -306,7 +336,7 @@ class RadialBatch(ds.Batch):
         derivative = np.array([sample for observation in self.derivative
                                for sample in observation] + [None])[:-1]
 
-        index = ds.DatasetIndex(len(time))
+        index = bf.DatasetIndex(len(time))
         batch = type(self)(index)
         batch.time = time
         batch.derivative = derivative
@@ -319,6 +349,29 @@ class RadialBatch(ds.Batch):
 
         return batch
 
-    # @ds.action
-    # @ds.inbatch_parallel(init="indices", target="threads")
-    # def log(self, src, dst)
+    @bf.action
+    @bf.inbatch_parallel(init="indices", post='_assemble_load', target="threads")
+    def delete_outliers(self, index):
+        """
+        Delete two types of outliers:
+        1. Items with negative derivative.
+        2. Item which have a large time difference between adjacent items and all subsequent items.
+
+        Returns
+        -------
+            Items without outliers
+        """
+        i = self.get_pos(None, 'time', index)
+        time = self.time[i]
+        derivative = self.derivative[i]
+
+        negative = np.where(derivative < 0)[0]
+        neighbors = np.diff(time)
+        mean_elems = np.array([neighbors[i]/np.mean(np.delete(neighbors, i)) for i in range(len(time)-1)])
+        outliers = np.where(mean_elems > 70)[0]
+        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else []
+
+        data = {}
+        data['time'] = np.delete(time, [*negative, *outliers])
+        data['derivative'] = np.delete(derivative, [*negative, *outliers])
+        return [data[comp] for comp in ['time', 'derivative']]
