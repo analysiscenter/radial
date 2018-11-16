@@ -3,36 +3,8 @@
 import numpy as np
 
 from .. import batchflow as bf
+from . import radial_batch_tools as bt
 
-
-def concatenate_points(batch, model, return_targets=True):
-    """Make data function that leads the data to the type required
-    for network training.
-
-    Parameters
-    ----------
-    batch : Dataset batch
-        Part of input data.
-    model : Dataset model
-        The model to train.
-    retrun_targets : bool
-        If ``True``, targets shape will be changed from ``(1,)`` to ``(-1, 1)``
-        targerts won't returned in another case.
-
-    Returns
-    -------
-    res_dict : dict
-        feed dict with inputs and targets (if needed).
-    """
-    _ = model
-    zip_data = zip(batch.time, batch.derivative)
-    points = np.array(list(map(lambda d: np.array([d[0], d[1]])\
-                .reshape(-1, batch.derivative[0].shape[1]), zip_data)))
-    res_dict = {'feed_dict': {'points': points}}
-    if return_targets:
-        y = batch.target.reshape(-1, 1)
-        res_dict['feed_dict']['targets'] = y
-    return res_dict
 
 class RadialBatch(bf.Batch):
     """
@@ -133,7 +105,7 @@ class RadialBatch(bf.Batch):
             If source path is not specified and batch's ``index`` is not a
             ``FilesIndex``.
         """
-        loaders = {'npz': self._load_npz}
+        loaders = {'npz': bt.load_npz}
 
         if isinstance(self.index, bf.FilesIndex):
             path = self.index.get_fullpath(indice)  # pylint: disable=no-member
@@ -141,36 +113,6 @@ class RadialBatch(bf.Batch):
             raise ValueError("Source path is not specified")
 
         return loaders[fmt](path, components, *args, **kwargs)
-
-    @staticmethod
-    def _load_npz(path=None, components=None, *args, **kwargs):
-        """Load given components from npz file.
-
-        Parameters
-        ----------
-        path : str
-            Path to .hea file.
-        components : iterable
-            Components to load.
-
-        Returns
-        -------
-        npz_data : list
-            List of data components.
-        """
-        _ = args, kwargs
-
-        data = dict(np.load(path))
-
-        time = data.pop('time')
-        derivative = data.pop('derivative')
-
-        order = np.argsort(time)
-
-        data['time'] = time[order]
-        data['derivative'] = derivative[order]
-
-        return [data[comp] for comp in components]
 
     def _assemble_load(self, results, *args, **kwargs):
         """Concatenate results of different workers and update ``self``.
@@ -199,7 +141,159 @@ class RadialBatch(bf.Batch):
 
     @bf.action
     @bf.inbatch_parallel(init="indices", target="threads")
-    def filter_outliers(self, index):
+    def drop_negative(self, index):
+        """
+        Leaves only positive values.
+
+        Raises
+        ------
+        ValueError
+            If all values in derivative component are negative.
+        """
+        i = self.get_pos(None, 'time', index)
+        time = self.time[i]
+        derivative = self.derivative[i]
+
+        mask = derivative > 0
+
+        if sum(mask) == 0:
+            raise ValueError("All values in derivative {} are negative!".format(index))
+
+        self.time[i] = time[mask]
+        self.derivative[i] = derivative[mask]
+
+        return self
+
+    @bf.action
+    @bf.inbatch_parallel(init="indices", target="threads")
+    def get_samples(self, index, n_points, n_samples=1,
+                    sampler=None, interpolate='linear', seed=None):
+        """ Draws samples from the interpolation of time and derivative components.
+
+        Performs interpolation of the `derivative` on time using
+        `scipy.interpolate.interp1d`, samples `n_points` within `time` component
+        range, and calculates values of `derivative` in sampled points.
+        Sampler should return values from [0, 1] interval, which later is
+        stretched to the range on `time` component. Size of the sample equals
+        `(n_samples, n_points)`.
+
+        Parameters
+        ----------
+        n_points : int
+            Size of a sample.
+        n_samples : int, optional
+            Numper of samples. Defaults to `1`.
+        sampler : function or named expression
+            Method to sample points within [0, 1] range.
+            If callable, it should only take `size` as an argument.
+        interpolate : str, optional
+            Specifies the kind of interpolation as a string
+            ('linear', 'nearest', 'zero', 'slinear', 'quadratic', 'cubic',
+            'previous', 'next', where 'zero', 'slinear', 'quadratic' and 'cubic'
+            refer to a spline interpolation of zeroth, first, second or third
+            order; 'previous' and 'next' simply return the previous or next value
+            of the point) or as an integer specifying the order of the spline
+            interpolator to use.
+        seed : int, optional
+            Numpy seed to be fixed. Defaults to None.
+        kwargs : misc
+            Named arguments to the sampling
+            or interpolation functions.
+
+        Returns
+        -------
+        batch : RadialBatch
+            Batch with changed `time` and `derivative`
+            components. Changes components inplace.
+
+        Note
+        ----
+        Sampler should have following parameters: `tmin`, `tmax`, `size`. Other
+        parameters to this function should be passed via kwargs.
+        See ``beta_sampler`` method for example.
+        """
+        if seed:
+            np.random.seed(seed)
+
+        i = self.get_pos(None, 'time', index)
+        time = self.time[i]
+        derivative = self.derivative[i]
+
+        interpolater = sc.interpolate.interp1d(time, derivative, kind=interpolate,
+                                               bounds_error=True, assume_sorted=True)
+
+        if  isinstance(sampler, bf.named_expr.R):
+            sampler = bf.R(sampler.name, **sampler.kwargs, size=(n_samples, n_points))
+            samples = sampler.get()
+        elif callable(sampler):
+            samples = sampler(size=(n_samples, n_points))
+        else:
+            raise ValueError("You should specify sampler function!")
+
+        tmin, tmax = np.min(time), np.max(time)
+        sample_times = samples * (tmax - tmin) + tmin
+        sample_times.sort(axis=-1)
+
+        sample_derivatives = interpolater(sample_times)
+
+        self.time[i] = np.array(sample_times)
+        self.derivative[i] = np.array(sample_derivatives)
+        return self
+
+    @bf.action
+    def unstack_samples(self):
+        """Create a new batch in which each element of `time` and `derivative`
+        along axis 0 is considered as a separate signal.
+
+        This method creates a new batch and unstacks components `time` and
+        `derivative`. Then the method updates other components by replication if
+        they are ndarrays of objects. Other types of components will be discarded.
+
+        Returns
+        -------
+        batch : same class as self
+            Batch with split `time` and `derivative` and replicated other components.
+
+        Examples
+        --------
+        >>> batch.time
+        array([array([[ 0,  1,  2,  3],
+                      [ 4,  5,  6,  7],
+                      [ 8,  9, 10, 11]])],
+              dtype=object)
+
+        >>> batch = batch.unstack_signals()
+        >>> batch.time
+        array([array([0, 1, 2, 3]),
+               array([4, 5, 6, 7]),
+               array([ 8,  9, 10, 11])],
+              dtype=object)
+        """
+        n_reps = [sig.shape[0] for sig in self.time]
+
+        # Adding [None] to the list and removing it from resulting
+        # array to make ndarray of arrays
+        time = np.array([sample for observation in self.time
+                         for sample in observation] + [None])[:-1]
+        derivative = np.array([sample for observation in self.derivative
+                               for sample in observation] + [None])[:-1]
+
+        index = bf.DatasetIndex(len(time))
+        batch = type(self)(index)
+        batch.time = time
+        batch.derivative = derivative
+
+        for component_name in set(self.components).intersection({"rig_type", "target"}):
+            component = getattr(self, component_name)
+            val = [elem for elem, n in zip(component, n_reps) for _ in range(n)]
+            val = np.array(val + [None])[:-1]
+            setattr(batch, component_name, val)
+
+        return batch
+
+    @bf.action
+    @bf.inbatch_parallel(init="indices", post='_assemble_load', target="threads")
+    def drop_outliers(self, index):
         """
         Finds and deletes outliers values.
         """
