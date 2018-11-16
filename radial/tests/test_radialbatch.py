@@ -67,21 +67,21 @@ def test_load(setup_batch): #pylint: disable=redefined-outer-name
     assert isinstance(batch.rig_type[0], str)
     del batch
 
-def test_filter_negative(setup_batch_loaded): #pylint: disable=redefined-outer-name
+def test_drop_negative(setup_batch_loaded): #pylint: disable=redefined-outer-name
     """
     Test method for filter of negative values.
     """
     # Arrange
     batch = setup_batch_loaded
     # Act
-    batch = batch.filter_negative()
+    batch = batch.drop_negative()
     # Assert
     assert np.all(batch.derivative[0] > 0)
     assert np.all(batch.derivative[1] > 0)
     del batch
 
 @pytest.mark.xfail
-def test_filter_negative_error(setup_batch_loaded): #pylint: disable=redefined-outer-name
+def test_drop_negative_error(setup_batch_loaded): #pylint: disable=redefined-outer-name
     """
     Test method for error in filtering.
     """
@@ -89,7 +89,7 @@ def test_filter_negative_error(setup_batch_loaded): #pylint: disable=redefined-o
     batch = setup_batch_loaded
     batch.derivative[0] -= (np.max(batch.derivative[0]) + 1)
     # Act
-    batch = batch.filter_negative()
+    batch = batch.drop_negative()
     # Assert
 
     del batch

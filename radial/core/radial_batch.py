@@ -1,6 +1,7 @@
 """ Batch class for radial regime regression. """
 
 import numpy as np
+import scipy as sc
 
 from .. import batchflow as bf
 from . import radial_batch_tools as bt
