@@ -1,7 +1,6 @@
 """ Batch class for radial regime regression. """
 
 import numpy as np
-import scipy as sc
 
 from .. import batchflow as bf
 from . import radial_batch_tools as bt
@@ -76,6 +75,7 @@ class RadialBatch(bf.Batch):
         batch : RadialBatch
             Batch with loaded components. Changes batch data inplace.
         """
+        _ = args, kwargs
         if isinstance(components, str):
             components = list(components)
         if components is None:
@@ -293,27 +293,19 @@ class RadialBatch(bf.Batch):
 
     @bf.action
     @bf.inbatch_parallel(init="indices", post='_assemble_load', target="threads")
-    def delete_outliers(self, index):
+    def drop_outliers(self, index):
         """
-        Delete two types of outliers:
-        1. Items with negative derivative.
-        2. Item which have a large time difference between adjacent items and all subsequent items.
-
-        Returns
-        -------
-            Items without outliers
+        Finds and deletes outliers values.
         """
         i = self.get_pos(None, 'time', index)
         time = self.time[i]
         derivative = self.derivative[i]
 
-        negative = np.where(derivative < 0)[0]
         neighbors = np.diff(time)
         mean_elems = np.array([neighbors[i]/np.mean(np.delete(neighbors, i)) for i in range(len(time)-1)])
         outliers = np.where(mean_elems > 70)[0]
-        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else []
+        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else np.empty(0)
 
-        data = {}
-        data['time'] = np.delete(time, [*negative, *outliers])
-        data['derivative'] = np.delete(derivative, [*negative, *outliers])
-        return [data[comp] for comp in ['time', 'derivative']]
+        self.time[i] = np.delete(time, outliers)
+        self.derivative[i] = np.delete(derivative, outliers)
+        return self
