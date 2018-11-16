@@ -4,8 +4,8 @@ import os
 import numpy as np
 import pytest
 
-from radial import RadialBatch, dataset as ds
-from radial.dataset import R
+from radial import RadialBatch, batchflow as bf
+from radial.batchflow import R
 
 
 @pytest.fixture(scope="module")
@@ -18,7 +18,7 @@ def setup_batch(request):
     files = ["rr_1.npz", "sg_1.npz"]
 
     if np.all([os.path.isfile(os.path.join(path, file)) for file in files]):
-        ind = ds.FilesIndex(path=os.path.join(path, '*.npz'), sort=True)
+        ind = bf.FilesIndex(path=os.path.join(path, '*.npz'), sort=True)
         batch = RadialBatch(ind)
     else:
         raise FileNotFoundError("Test files not found in 'tests/data/'!")
