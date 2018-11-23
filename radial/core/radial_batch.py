@@ -1,13 +1,83 @@
 """ Batch class for radial regime regression. """
 
+from functools import wraps
+
 import numpy as np
 import scipy as sc
 
-from .. import batchflow as bf
 from . import radial_batch_tools as bt
+from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
+
+def _safe_make_array(dst, len_src):
+    """ Makes array from dst data. Raises exception if length of resulting array
+    is not equal to len_src. If dst is None returns array of None of length len_src.
+    Parameters
+    ----------
+    dst : str or None or list, tuple, np.ndarray of str
+        Contains names of batch component(s) to be processed
+    len_src : int
+        Desired length of resulting array
+    Returns
+    -------
+    np.array
+    """
+    if not isinstance(dst, (list, tuple, np.ndarray)):
+        if not dst:
+            dst = np.array([None] * len_src)
+        else:
+            dst = np.asarray(dst).reshape(-1)
+    elif not len(dst) == len_src:
+        raise ValueError('Number of given components must be equal')
+    return dst
+
+def safe_src_dst_preprocess(method):
+    """ Decorator used for preprocessing  kwargs such as src, dst, src_range, dst_range.
+    Modifies str to list of str, inserts default values and raises ValueError if mandatory
+    parameters are missing.
+
+    Parameters
+    ----------
+    method : method to be decorated
+
+    Returns
+    -------
+    Method with updated kwargs
+    """
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        """ Wrapper
+        """
+        src = kwargs.get('src', None)
+        dst = kwargs.get('dst', None)
+        src_range = kwargs.get('src_range', None)
+        dst_range = kwargs.get('dst_range', None)
+
+        src = np.asarray(src).reshape(-1)
+        dst = _safe_make_array(dst, len(src))
+
+        src_range = _safe_make_array(src_range, len(src))
+        dst_range = _safe_make_array(dst_range, len(src))
+
+        for i, component in enumerate(src):
+            if not component:
+                raise ValueError('Required argument `src` (pos 1) not found')
+            if not hasattr(self, component):
+                raise ValueError('Component passed in src does not exist')
+            if not dst[i]:
+                dst[i] = component
+            if not hasattr(self, dst[i]):
+                setattr(self, dst[i], self.array_of_nones)
+
+            if src_range[i] and not hasattr(self, src_range[i]):
+                raise ValueError('Component provided in src_range does not exist')
+            if dst_range[i] and not hasattr(self, dst_range[i]):
+                setattr(self, dst_range[i], self.array_of_nones)
+        kwargs.update(src=src, dst=dst, src_range=src_range, dst_range=dst_range)
+        return method(self, *args, **kwargs)
+    return wrapper
 
 
-class RadialBatch(bf.Batch):
+class RadialBatch(Batch):
     """
     Batch class that stores multiple time series along with other parameters
     for radial flow regime regression.
@@ -30,6 +100,7 @@ class RadialBatch(bf.Batch):
         self.derivative = self.array_of_nones
         self.rig_type = self.array_of_nones
         self.target = self.array_of_nones
+        self.predictions = self.array_of_nones
 
     @property
     def components(self):
@@ -54,11 +125,11 @@ class RadialBatch(bf.Batch):
         RuntimeError
             If any paralleled action raised an ``Exception``.
         """
-        if bf.any_action_failed(results):
+        if any_action_failed(results):
             all_errors = self.get_errors(results)
             raise RuntimeError("Cannot assemble the batch", all_errors)
 
-    @bf.action
+    @action
     def load(self, fmt=None, components=None, *args, **kwargs):
         """Load given batch components.
 
@@ -84,7 +155,7 @@ class RadialBatch(bf.Batch):
 
         return self._load(fmt, components)
 
-    @bf.inbatch_parallel(init="indices", post="_assemble_load", target="threads")
+    @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
         """
         Load given components from file.
@@ -108,7 +179,7 @@ class RadialBatch(bf.Batch):
         """
         loaders = {'npz': bt.load_npz}
 
-        if isinstance(self.index, bf.FilesIndex):
+        if isinstance(self.index, FilesIndex):
             path = self.index.get_fullpath(indice)  # pylint: disable=no-member
         else:
             raise ValueError("Source path is not specified")
@@ -140,8 +211,8 @@ class RadialBatch(bf.Batch):
             setattr(self, comp, data)
         return self
 
-    @bf.action
-    @bf.inbatch_parallel(init="indices", target="threads")
+    @action
+    @inbatch_parallel(init="indices", target="threads")
     def drop_negative(self, index):
         """
         Leaves only positive values.
@@ -165,8 +236,8 @@ class RadialBatch(bf.Batch):
 
         return self
 
-    @bf.action
-    @bf.inbatch_parallel(init="indices", target="threads")
+    @action
+    @inbatch_parallel(init="indices", target="threads")
     def get_samples(self, index, n_points, n_samples=1,
                     sampler=None, interpolate='linear', seed=None):
         """ Draws samples from the interpolation of time and derivative components.
@@ -223,8 +294,8 @@ class RadialBatch(bf.Batch):
         interpolater = sc.interpolate.interp1d(time, derivative, kind=interpolate,
                                                bounds_error=True, assume_sorted=True)
 
-        if  isinstance(sampler, bf.named_expr.R):
-            sampler = bf.R(sampler.name, **sampler.kwargs, size=(n_samples, n_points))
+        if  isinstance(sampler, R):
+            sampler = R(sampler.name, **sampler.kwargs, size=(n_samples, n_points))
             samples = sampler.get()
         elif callable(sampler):
             samples = sampler(size=(n_samples, n_points))
@@ -241,7 +312,7 @@ class RadialBatch(bf.Batch):
         self.derivative[i] = np.array(sample_derivatives)
         return self
 
-    @bf.action
+    @action
     def unstack_samples(self):
         """Create a new batch in which each element of `time` and `derivative`
         along axis 0 is considered as a separate signal.
@@ -279,7 +350,7 @@ class RadialBatch(bf.Batch):
         derivative = np.array([sample for observation in self.derivative
                                for sample in observation] + [None])[:-1]
 
-        index = bf.DatasetIndex(len(time))
+        index = DatasetIndex(len(time))
         batch = type(self)(index)
         batch.time = time
         batch.derivative = derivative
@@ -292,8 +363,8 @@ class RadialBatch(bf.Batch):
 
         return batch
 
-    @bf.action
-    @bf.inbatch_parallel(init="indices", post='_assemble_load', target="threads")
+    @action
+    @inbatch_parallel(init="indices", target="threads")
     def drop_outliers(self, index):
         """
         Finds and deletes outliers values.
@@ -309,4 +380,142 @@ class RadialBatch(bf.Batch):
 
         self.time[i] = np.delete(time, outliers)
         self.derivative[i] = np.delete(derivative, outliers)
+        return self
+
+    @action
+    @safe_src_dst_preprocess
+    @inbatch_parallel(init='indices')
+    def normalize(self, ix, src=None, dst=None, src_range=None, dst_range=None):
+        """ Normalizes data element-wise to range [0, 1] by exctracting
+        min(data) and dividing by (max(data)-min(data)).
+        Parameters
+        ----------
+        src : list of either str or None
+            Contains names of batch component(s) to be normalized
+        dst : list of either str or None
+            Contains names of batch component(s) where normalized components will be stored.
+        dst_range : list of either str or None
+            Contains names of batch component(s) where range of normalized componentes will
+            be stored.
+            Range is saved as a list of 2 elements:
+            `[min(component_data), max(component_data) - min(component_data)].`
+            if None then no range will be stored.
+        src_range : list of either str or None
+            Contains names of batch component(s) where range of normalized componentes have
+            already been stored. If not None then component will be normalized with
+            the given range.
+        Returns
+        -------
+        self
+
+        """
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            comp_data = getattr(self, component)[pos]
+            if src_range[i]:
+                min_value, scale_value = getattr(self, src_range[i])[pos]
+            else:
+                min_value, scale_value = np.min(comp_data), (np.max(comp_data) - np.min(comp_data))
+            new_data = (comp_data - min_value) / scale_value
+            getattr(self, dst[i])[pos] = new_data
+            if dst_range[i]:
+                getattr(self, dst_range[i])[pos] = [min_value, scale_value]
+        return self
+
+    @action
+    @safe_src_dst_preprocess
+    @inbatch_parallel(init='indices')
+    def make_grid_data(self, ix, src=None, dst=None, grid_size=500, **kwargs):
+        """ Makes grid
+        Parameters
+        ----------
+        src : str or list of str
+            Contains names of batch component(s) to make grid data from in format (x, y)
+        dst : str or list of str
+            Contains names of batch component(s) where (x_grid, y_grid) will be stored.
+        grid_size : int
+            Number of points in a grid
+
+        Returns
+        -------
+        self
+        """
+        _ = kwargs
+        if not (len(src) == 2 and len(dst) == 2):
+            raise ValueError('Exactly two components must be passed to make grid data')
+
+        pos = self.get_pos(None, src[0], ix)
+
+        x_data = getattr(self, src[0])[pos]
+        y_data = getattr(self, src[1])[pos]
+
+        sorted_data = list(zip(*sorted(zip(x_data, y_data), key=lambda x: x[0])))
+
+        x_grid = np.linspace(0, 1, num=grid_size)
+        y_grid = np.interp(x_grid, sorted_data[0], sorted_data[1])
+
+        getattr(self, dst[0])[pos] = x_grid
+        getattr(self, dst[1])[pos] = y_grid.reshape((-1, 1))
+        return self
+
+    @action
+    @safe_src_dst_preprocess
+    @inbatch_parallel(init='indices')
+    def denormalize_component(self, ix, src=None, dst=None, src_range=None, **kwargs):
+        """ Denormalizes component to initial range.
+
+        Parameters
+        ----------
+        src : list of str
+            Contains names of batch component(s) to be denormalized
+        dst : list of either str or None
+            Contains names of batch component(s) where denormalized components will be stored.
+        src_range : list of str
+            Contains names of batch component(s) where range data has been stored in format
+            `[min(component_data), max(component_data) - min(component_data)].`
+
+        Returns
+        -------
+        self
+        """
+        _ = kwargs
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            comp_data = getattr(self, component)[pos]
+            if src_range[i]:
+                min_value, scale_value = getattr(self, src_range[i])[pos]
+                new_data = (comp_data - min_value) / scale_value
+                new_data = comp_data * scale_value + min_value
+                getattr(self, dst[i])[pos] = new_data
+            else:
+                raise ValueError('Src_range must be provided to denormalize component')
+        return self
+
+    @action
+    @safe_src_dst_preprocess
+    def make_array(self, src=None, dst=None, **kwargs):
+        """ TODO: Should be rewritten as post function
+        """
+        _ = kwargs
+        for i, component in enumerate(src):
+            setattr(self, dst[i], np.stack(getattr(self, component)))
+        return self
+
+    @action
+    @safe_src_dst_preprocess
+    def expand_dims(self, src=None, dst=None, **kwargs):
+        """ Expands the shape of an array stored in a given component.
+        Parameters
+        ----------
+        src : list of str
+            Contains names of batch component(s) to be modiified
+        dst : list of either str or None
+            Contains names of batch component(s) where modiified components will be stored
+        Returns
+        -------
+        self
+        """
+        _ = kwargs
+        for i, component in enumerate(src):
+            setattr(self, dst[i], getattr(self, component).reshape((-1, 1)))
         return self
