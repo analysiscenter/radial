@@ -30,8 +30,39 @@ def _safe_make_array(dst, len_src):
         raise ValueError('Number of given components must be equal')
     return dst
 
+def dst_preprocess(method):
+    """ Decorator used for creation dst if needed.
+
+    Parameters
+    ----------
+    method : method to be decorated
+
+    Returns
+    -------
+    Method wtih updated kwargs
+    """
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        """Wrapper"""
+        _ = args, kwargs
+        src = kwargs.get('src', None)
+        dst = kwargs.get('dst', None)
+
+        if dst is None:
+            return method(self, *args, **kwargs)
+
+        dst_shape = len(dst) if src is None else len(src)
+        dst = _safe_make_array(dst, dst_shape)
+
+        for _, component in enumerate(dst):
+            if not hasattr(self, component):
+                setattr(self, component, self.array_of_nones)
+        kwargs.update(dst=dst)
+        return method(self, *args, **kwargs)
+    return wrapper
+
 def safe_src_dst_preprocess(method):
-    """ Decorator used for preprocessing  kwargs such as src, dst, src_range, dst_range.
+    """ Decorator used for preprocessing kwargs such as src, dst, src_range, dst_range.
     Modifies str to list of str, inserts default values and raises ValueError if mandatory
     parameters are missing.
 
@@ -51,7 +82,6 @@ def safe_src_dst_preprocess(method):
         dst = kwargs.get('dst', None)
         src_range = kwargs.get('src_range', None)
         dst_range = kwargs.get('dst_range', None)
-
         src = np.asarray(src).reshape(-1)
         dst = _safe_make_array(dst, len(src))
 
@@ -61,6 +91,8 @@ def safe_src_dst_preprocess(method):
         for i, component in enumerate(src):
             if not component:
                 raise ValueError('Required argument `src` (pos 1) not found')
+            if isinstance(component, str):
+                pass
             if not hasattr(self, component):
                 raise ValueError('Component passed in src does not exist')
             if not dst[i]:
@@ -212,8 +244,9 @@ class RadialBatch(Batch):
         return self
 
     @action
+    @dst_preprocess
     @inbatch_parallel(init="indices", target="threads")
-    def drop_negative(self, index):
+    def drop_negative(self, index, src=None, dst=None):
         """
         Leaves only positive values.
 
@@ -222,24 +255,51 @@ class RadialBatch(Batch):
         ValueError
             If all values in derivative component are negative.
         """
-        i = self.get_pos(None, 'time', index)
-        time = self.time[i]
-        derivative = self.derivative[i]
+        src = src if src else ['time', 'derivative']
+        dst = dst if dst else ['time', 'derivative']
+
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
 
         mask = derivative > 0
 
         if sum(mask) == 0:
             raise ValueError("All values in derivative {} are negative!".format(index))
 
-        self.time[i] = time[mask]
-        self.derivative[i] = derivative[mask]
+        getattr(self, dst[0])[i] = time[mask]
+        getattr(self, dst[1])[i] = derivative[mask]
 
         return self
 
     @action
+    @dst_preprocess
     @inbatch_parallel(init="indices", target="threads")
-    def get_samples(self, index, n_points, n_samples=1,
-                    sampler=None, interpolate='linear', seed=None):
+    def drop_outliers(self, index, src=None, dst=None):
+        """
+        Finds and deletes outliers values.
+        """
+        src = src if src else ['time', 'derivative']
+        dst = dst if dst else ['time', 'derivative']
+
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
+
+        neighbors = np.diff(time)
+        mean_elems = np.array([neighbors[i]/np.mean(np.delete(neighbors, i)) for i in range(len(time)-1)])
+        outliers = np.where(mean_elems > 70)[0]
+        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else np.empty(0)
+
+        getattr(self, dst[0])[i] = np.delete(time, outliers)
+        getattr(self, dst[1])[i] = np.delete(derivative, outliers)
+        return self
+
+    @action
+    @dst_preprocess
+    @inbatch_parallel(init="indices", target="threads")
+    def get_samples(self, index, n_points, src=None, dst=None, # pylint: disable=too-many-arguments
+                    n_samples=1, sampler=None, interpolate='linear', seed=None):
         """ Draws samples from the interpolation of time and derivative components.
 
         Performs interpolation of the `derivative` on time using
@@ -287,9 +347,12 @@ class RadialBatch(Batch):
         if seed:
             np.random.seed(seed)
 
-        i = self.get_pos(None, 'time', index)
-        time = self.time[i]
-        derivative = self.derivative[i]
+        src = src if src else ['time', 'derivative']
+        dst = dst if dst else ['time', 'derivative']
+
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
 
         interpolater = sc.interpolate.interp1d(time, derivative, kind=interpolate,
                                                bounds_error=True, assume_sorted=True)
@@ -308,8 +371,8 @@ class RadialBatch(Batch):
 
         sample_derivatives = interpolater(sample_times)
 
-        self.time[i] = np.array(sample_times)
-        self.derivative[i] = np.array(sample_derivatives)
+        getattr(self, dst[0])[i] = np.array(sample_times)
+        getattr(self, dst[1])[i] = np.array(sample_derivatives)
         return self
 
     @action
@@ -364,22 +427,26 @@ class RadialBatch(Batch):
         return batch
 
     @action
-    @inbatch_parallel(init="indices", target="threads")
-    def drop_outliers(self, index):
-        """
-        Finds and deletes outliers values.
-        """
-        i = self.get_pos(None, 'time', index)
-        time = self.time[i]
-        derivative = self.derivative[i]
+    @dst_preprocess
+    def make_points(self, src=None, dst=None):
+        """Generated new component with name `dst` with value from `src`."""
 
-        neighbors = np.diff(time)
-        mean_elems = np.array([neighbors[i]/np.mean(np.delete(neighbors, i)) for i in range(len(time)-1)])
-        outliers = np.where(mean_elems > 70)[0]
-        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else np.empty(0)
+        src = src if src else ['time', 'derivative']
+        if dst is None:
+            dst = 'points'
+            setattr(self, dst, self.array_of_nones)
+        points = []
+        for comp in src:
+            points.append(np.vstack(getattr(self, comp)))
+        if not isinstance(dst, str):
+            dst = dst[0]
+        setattr(self, dst, np.array(list(zip(*points))))
+        return self
 
-        self.time[i] = np.delete(time, outliers)
-        self.derivative[i] = np.delete(derivative, outliers)
+    @action
+    def prepare_answer(self, component='target'):
+        """Reshaped component co vector with shape = (-1, 1)."""
+        setattr(self, component, getattr(self, component).reshape(-1, 1))
         return self
 
     @action
@@ -479,6 +546,7 @@ class RadialBatch(Batch):
         self
         """
         _ = kwargs
+
         for i, component in enumerate(src):
             pos = self.get_pos(None, component, ix)
             comp_data = getattr(self, component)[pos]
