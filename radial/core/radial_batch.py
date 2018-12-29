@@ -1,112 +1,10 @@
 """ Batch class for radial regime regression. """
-
-from functools import wraps
-
 import numpy as np
 import scipy as sc
 
 from . import radial_batch_tools as bt
+from .decorators import init_components
 from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
-
-def _safe_make_array(dst, len_src):
-    """ Makes array from dst data. Raises exception if length of resulting array
-    is not equal to len_src. If dst is None returns array of None of length len_src.
-    Parameters
-    ----------
-    dst : str or None or list, tuple, np.ndarray of str
-        Contains names of batch component(s) to be processed
-    len_src : int
-        Desired length of resulting array
-    Returns
-    -------
-    np.array
-    """
-    if not isinstance(dst, (list, tuple, np.ndarray)):
-        if not dst:
-            dst = np.array([None] * len_src)
-        else:
-            dst = np.asarray(dst).reshape(-1)
-    elif not len(dst) == len_src:
-        raise ValueError('Number of given components must be equal')
-    return dst
-
-def dst_preprocess(method):
-    """ Decorator used for creation dst if needed.
-
-    Parameters
-    ----------
-    method : method to be decorated
-
-    Returns
-    -------
-    Method wtih updated kwargs
-    """
-    @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """Wrapper"""
-        _ = args, kwargs
-        src = kwargs.get('src', None)
-        dst = kwargs.get('dst', None)
-
-        if dst is None:
-            return method(self, *args, **kwargs)
-
-        dst_shape = len(dst) if src is None else len(src)
-        dst = _safe_make_array(dst, dst_shape)
-
-        for _, component in enumerate(dst):
-            if not hasattr(self, component):
-                setattr(self, component, self.array_of_nones)
-        kwargs.update(dst=dst)
-        return method(self, *args, **kwargs)
-    return wrapper
-
-def safe_src_dst_preprocess(method):
-    """ Decorator used for preprocessing kwargs such as src, dst, src_range, dst_range.
-    Modifies str to list of str, inserts default values and raises ValueError if mandatory
-    parameters are missing.
-
-    Parameters
-    ----------
-    method : method to be decorated
-
-    Returns
-    -------
-    Method with updated kwargs
-    """
-    @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """ Wrapper
-        """
-        src = kwargs.get('src', None)
-        dst = kwargs.get('dst', None)
-        src_range = kwargs.get('src_range', None)
-        dst_range = kwargs.get('dst_range', None)
-        src = np.asarray(src).reshape(-1)
-        dst = _safe_make_array(dst, len(src))
-
-        src_range = _safe_make_array(src_range, len(src))
-        dst_range = _safe_make_array(dst_range, len(src))
-
-        for i, component in enumerate(src):
-            if not component:
-                raise ValueError('Required argument `src` (pos 1) not found')
-            if isinstance(component, str):
-                pass
-            if not hasattr(self, component):
-                raise ValueError('Component passed in src does not exist')
-            if not dst[i]:
-                dst[i] = component
-            if not hasattr(self, dst[i]):
-                setattr(self, dst[i], self.array_of_nones)
-
-            if src_range[i] and not hasattr(self, src_range[i]):
-                raise ValueError('Component provided in src_range does not exist')
-            if dst_range[i] and not hasattr(self, dst_range[i]):
-                setattr(self, dst_range[i], self.array_of_nones)
-        kwargs.update(src=src, dst=dst, src_range=src_range, dst_range=dst_range)
-        return method(self, *args, **kwargs)
-    return wrapper
 
 
 class RadialBatch(Batch):
@@ -134,18 +32,15 @@ class RadialBatch(Batch):
         self.target = self.array_of_nones
         self.predictions = self.array_of_nones
 
-    @property
-    def components(self):
-        """tuple of str: Data components names."""
-        return "time", "derivative", "rig_type", "target"
+    components = "time", "derivative", "rig_type", "target"
 
     @property
     def array_of_nones(self):
-        """1-D ndarray: ``NumPy`` array with ``None`` values."""
+        """ 1-D ndarray: ``NumPy`` array with ``None`` values."""
         return np.array([None] * len(self.index))
 
     def _reraise_exceptions(self, results):
-        """Reraise all exceptions in the ``results`` list.
+        """ Reraise all exceptions in the ``results`` list.
 
         Parameters
         ----------
@@ -163,7 +58,7 @@ class RadialBatch(Batch):
 
     @action
     def load(self, fmt=None, components=None, *args, **kwargs):
-        """Load given batch components.
+        """ Load given batch components.
 
         This method supports loading of data from npz format.
 
@@ -188,9 +83,8 @@ class RadialBatch(Batch):
         return self._load(fmt, components)
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
-    def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
-        """
-        Load given components from file.
+    def _load(self, indice, fmt=None, components=None, *args, **kwargs):
+        """ Load given components from file.
 
         Parameters
         ----------
@@ -219,7 +113,7 @@ class RadialBatch(Batch):
         return loaders[fmt](path, components, *args, **kwargs)
 
     def _assemble_load(self, results, *args, **kwargs):
-        """Concatenate results of different workers and update ``self``.
+        """ Concatenate results of different workers and update ``self``.
 
         Parameters
         ----------
@@ -244,20 +138,17 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @dst_preprocess
+    @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def drop_negative(self, index, src=None, dst=None):
-        """
-        Leaves only positive values.
+    def drop_negative(self, index, src=None, dst=None, **kwargs):
+        """ Leaves only positive values.
 
         Raises
         ------
         ValueError
             If all values in derivative component are negative.
         """
-        src = src if src else ['time', 'derivative']
-        dst = dst if dst else ['time', 'derivative']
-
+        _ = kwargs
         i = self.get_pos(None, src[0], index)
         time = getattr(self, src[0])[i]
         derivative = getattr(self, src[1])[i]
@@ -269,19 +160,15 @@ class RadialBatch(Batch):
 
         getattr(self, dst[0])[i] = time[mask]
         getattr(self, dst[1])[i] = derivative[mask]
-
         return self
 
     @action
-    @dst_preprocess
+    @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def drop_outliers(self, index, src=None, dst=None):
+    def drop_outliers(self, index, src=None, dst=None, **kwargs):
+        """ Finds and deletes outliers values.
         """
-        Finds and deletes outliers values.
-        """
-        src = src if src else ['time', 'derivative']
-        dst = dst if dst else ['time', 'derivative']
-
+        _ = kwargs
         i = self.get_pos(None, src[0], index)
         time = getattr(self, src[0])[i]
         derivative = getattr(self, src[1])[i]
@@ -296,10 +183,10 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @dst_preprocess
+    @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def get_samples(self, index, n_points, src=None, dst=None, # pylint: disable=too-many-arguments
-                    n_samples=1, sampler=None, interpolate='linear', seed=None):
+    def get_samples(self, index, n_points, n_samples=1, sampler=None, # pylint: disable=too-many-arguments
+                    src=None, dst=None, interpolate='linear', seed=None, **kwargs):
         """ Draws samples from the interpolation of time and derivative components.
 
         Performs interpolation of the `derivative` on time using
@@ -344,11 +231,9 @@ class RadialBatch(Batch):
         parameters to this function should be passed via kwargs.
         See ``beta_sampler`` method for example.
         """
+        _ = kwargs
         if seed:
             np.random.seed(seed)
-
-        src = src if src else ['time', 'derivative']
-        dst = dst if dst else ['time', 'derivative']
 
         i = self.get_pos(None, src[0], index)
         time = getattr(self, src[0])[i]
@@ -377,7 +262,7 @@ class RadialBatch(Batch):
 
     @action
     def unstack_samples(self):
-        """Create a new batch in which each element of `time` and `derivative`
+        """ Create a new batch in which each element of `time` and `derivative`
         along axis 0 is considered as a separate signal.
 
         This method creates a new batch and unstacks components `time` and
@@ -423,18 +308,13 @@ class RadialBatch(Batch):
             val = [elem for elem, n in zip(component, n_reps) for _ in range(n)]
             val = np.array(val + [None])[:-1]
             setattr(batch, component_name, val)
-
         return batch
 
     @action
-    @dst_preprocess
-    def make_points(self, src=None, dst=None):
-        """Generated new component with name `dst` with value from `src`."""
-
-        src = src if src else ['time', 'derivative']
-        if dst is None:
-            dst = 'points'
-            setattr(self, dst, self.array_of_nones)
+    @init_components
+    def make_points(self, src=None, dst=None, **kwargs):
+        """ Generated new component with name `dst` with value from `src`."""
+        _ = kwargs
         points = []
         for comp in src:
             points.append(np.vstack(getattr(self, comp)))
@@ -444,15 +324,16 @@ class RadialBatch(Batch):
         return self
 
     @action
-    def prepare_answer(self, component='target'):
-        """Reshaped component co vector with shape = (-1, 1)."""
-        setattr(self, component, getattr(self, component).reshape(-1, 1))
+    def prepare_answer(self, src='target', **kwargs):
+        """ Reshaped component co vector with shape = (-1, 1)."""
+        _ = kwargs
+        setattr(self, src, getattr(self, src).reshape(-1, 1))
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
-    def normalize(self, ix, src=None, dst=None, src_range=None, dst_range=None):
+    def normalize(self, ix, src=None, dst=None, src_range=None, dst_range=None, **kwargs):
         """ Normalizes data element-wise to range [0, 1] by exctracting
         min(data) and dividing by (max(data)-min(data)).
         Parameters
@@ -476,6 +357,7 @@ class RadialBatch(Batch):
         self
 
         """
+        _ = kwargs
         for i, component in enumerate(src):
             pos = self.get_pos(None, component, ix)
             comp_data = getattr(self, component)[pos]
@@ -485,12 +367,13 @@ class RadialBatch(Batch):
                 min_value, scale_value = np.min(comp_data), (np.max(comp_data) - np.min(comp_data))
             new_data = (comp_data - min_value) / scale_value
             getattr(self, dst[i])[pos] = new_data
+
             if dst_range[i]:
                 getattr(self, dst_range[i])[pos] = [min_value, scale_value]
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
     def make_grid_data(self, ix, src=None, dst=None, grid_size=500, **kwargs):
         """ Makes grid
@@ -526,7 +409,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
     def denormalize_component(self, ix, src=None, dst=None, src_range=None, **kwargs):
         """ Denormalizes component to initial range.
@@ -560,7 +443,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     def make_array(self, src=None, dst=None, **kwargs):
         """ TODO: Should be rewritten as post function
         """
@@ -570,7 +453,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     def expand_dims(self, src=None, dst=None, **kwargs):
         """ Expands the shape of an array stored in a given component.
         Parameters
