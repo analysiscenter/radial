@@ -74,7 +74,7 @@ def test_drop_negative(setup_batch_loaded): #pylint: disable=redefined-outer-nam
     # Arrange
     batch = setup_batch_loaded
     # Act
-    batch = batch.drop_negative()
+    batch = batch.drop_negative(src=['time', 'derivative'])
     # Assert
     assert np.all(batch.derivative[0] > 0)
     assert np.all(batch.derivative[1] > 0)
@@ -101,7 +101,7 @@ def test_get_samples(setup_batch_loaded): #pylint: disable=redefined-outer-name
     # Arrange
     batch = setup_batch_loaded
     # Act
-    batch = batch.get_samples(100, 2, R('beta', a=1, b=1))
+    batch = batch.get_samples(100, 2, R('beta', a=1, b=1), src=['time', 'derivative'])
     # Assert
     assert batch.time.shape == (2,)
     assert batch.derivative[0].shape == (2, 100)
@@ -118,7 +118,7 @@ def test_unstack_samples(setup_batch_loaded): #pylint: disable=redefined-outer-n
     batch = setup_batch_loaded
     # Act
     batch = (batch
-             .get_samples(100, 2, R('beta', a=1, b=1))
+             .get_samples(100, 2, R('beta', a=1, b=1), src=['time', 'derivative'])
              .unstack_samples()
             )
     # Assert
