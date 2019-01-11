@@ -1,35 +1,42 @@
 """ Tools for RadialBatch """
 
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error as mae
 
-def concatenate_points(batch, model, return_targets=True):
-    """Make data function that leads the data to the type required
-    for network training.
+
+def calculate_metrics(target, pred, bins=0, returns=False):
+    """Calculate following metrics:
+    * MAE
+    * MAPE
+    * Percentage of error less than 30%
 
     Parameters
     ----------
-    batch : Dataset batch
-        Part of input data.
-    model : Dataset model
-        The model to train.
-    retrun_targets : bool
-        If ``True``, targets shape will be changed from ``(1,)`` to ``(-1, 1)``
-        targerts won't returned in another case.
-
-    Returns
-    -------
-    res_dict : dict
-        feed dict with inputs and targets (if needed).
+    target : list or np.array
+        array with answers
+    pred : list or np.array
+        array with predictions
+    bins : int
+        number of bins in histogram, if 0 the histogram will not be displayed
+    returns : bool
+        if True, metrics will be returned
     """
-    _ = model
-    zip_data = zip(batch.time, batch.derivative)
-    points = np.array(list(map(lambda d: np.array([d[0], d[1]])\
-                .reshape(-1, batch.derivative[0].shape[1]), zip_data)))
-    res_dict = {'feed_dict': {'points': points}}
-    if return_targets:
-        y = batch.target.reshape(-1, 1)
-        res_dict['feed_dict']['targets'] = y
-    return res_dict
+    mape = np.abs(target-pred)/target
+    mae_val = mae(target, pred)
+    perc = np.mean(mape < 0.3)*100
+    print('MAE: {:.4}'.format(mae_val))
+    print('MAPE: {:.4}'.format(np.mean(mape)))
+    print('Percentage of error less than 30%: {:.4}%'.format(perc))
+    if bins:
+        plt.figure(figsize=(8, 6))
+        sns.distplot(mape, bins=bins)
+        plt.title('MAPE hist')
+        plt.show()
+    if returns:
+        return np.mean(mape), mae_val, perc
+    return None
 
 def load_npz(path=None, components=None, *args, **kwargs):
     """Load given components from npz file.
