@@ -148,12 +148,16 @@ class RadialBatch(Batch):
             Batch with loaded components. Changes batch data inplace.
         """
         _ = args, kwargs
-        if isinstance(components, str):
-            components = list(components)
-        if components is None:
-            components = self.components
+        if fmt in ['csv']:
+            super()._load_table(fmt=fmt, components=components, *args, **kwargs)
+            return self
+        else:
+            if isinstance(components, str):
+                components = list(components)
+            if components is None:
+                components = self.components
 
-        return self._load(fmt, components)
+            return self._load(fmt, components)
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
