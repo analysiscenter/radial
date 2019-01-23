@@ -6,7 +6,7 @@ import numpy as np
 import scipy as sc
 
 from . import radial_batch_tools as bt
-from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
+from ..batchflow import Batch, ImagesBatch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
 
 def _safe_make_array(dst, len_src):
     """ Makes array from dst data. Raises exception if length of resulting array
@@ -105,7 +105,7 @@ class RadialBatch(Batch):
     @property
     def components(self):
         """tuple of str: Data components names."""
-        return "time", "derivative", "rig_type", "target"
+        return "time", "derivative", "rig_type", "target", "predictions"
 
     @property
     def array_of_nones(self):
@@ -148,16 +148,16 @@ class RadialBatch(Batch):
             Batch with loaded components. Changes batch data inplace.
         """
         _ = args, kwargs
-        if fmt in ['csv']:
+        components = [components] if isinstance(components, str) else components
+
+        if fmt == 'csv':
             super()._load_table(fmt=fmt, components=components, *args, **kwargs)
             return self
-        else:
-            if isinstance(components, str):
-                components = list(components)
+        elif fmt == 'npz':
             if components is None:
-                components = self.components
-
+                components = ["time", "derivative", "rig_type", "target"]
             return self._load(fmt, components)
+        
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
@@ -465,7 +465,7 @@ class RadialBatch(Batch):
     @action
     @safe_src_dst_preprocess
     @inbatch_parallel(init='indices')
-    def denormalize_component(self, ix, src=None, dst=None, src_range=None, **kwargs):
+    def denormalize(self, ix, src=None, dst=None, src_range=None, **kwargs):
         """ Denormalizes component to initial range.
 
         Parameters
@@ -522,4 +522,44 @@ class RadialBatch(Batch):
         _ = kwargs
         for i, component in enumerate(src):
             setattr(self, dst[i], getattr(self, component).reshape((-1, 1)))
+        return self
+
+class RadialImagesBatch(ImagesBatch, RadialBatch):
+    """
+    Batch class that stores multiple time series along with other parameters
+    for radial flow regime regression.
+
+    Parameters
+    ----------
+    index : DatasetIndex
+        Unique identifiers of rig data in the batch.
+    preloaded : tuple, optional
+        Data to put in the batch if given. Defaults to ``None``.
+
+    Attributes
+    ----------
+    index : DatasetIndex
+        Unique identifiers of rig data in the batch.
+    """
+    def __init__(self, index, preloaded=None):
+        super().__init__(index, preloaded)
+        self.time = self.array_of_nones
+        self.derivative = self.array_of_nones
+        self.rig_type = self.array_of_nones
+        self.target = self.array_of_nones
+        self.predictions = self.array_of_nones
+
+    @property
+    def components(self):
+        """tuple of str: Data components names."""
+        return "time", "derivative", "rig_type", "target", "predictions", "images"
+
+    @action
+    def load(self, fmt=None, components=None, *args, **kwargs):
+        components = [components] if isinstance(components, str) else components
+
+        if fmt == 'npz' or fmt == 'csv':
+            RadialBatch.load(self, fmt=fmt, components=components, *args, **kwargs)
+        elif fmt == 'image':
+            ImagesBatch.load(self, fmt=fmt, components=components, *args, **kwargs)
         return self
