@@ -49,16 +49,19 @@ def create_datasets(path, batch, cross_val=None):
         dsets.append([dset_train, dset_test])
     return dsets
 
-def split_df_by_name(dataframe, parameters):
+def split_df_by_name(dataframe, parameters, draw_dict=None):
     """Split the dataframe on the parts with different values in `name` column.
 
     Parameters
     ----------
     dataframe : pd.Dataframe
-        Result of Research
+        Result of Research.
     parameters : list
-        Matched parameters from Research
-
+        Matched parameters from Research.
+    draw_dict : dict
+        Only current params from dictionary will be drawn.
+        Keys : names of columns.
+        Values : The values of visualize params.
     Returns
     -------
         : dict
@@ -66,6 +69,9 @@ def split_df_by_name(dataframe, parameters):
         value : resulted dataframe
     """
     all_names = {}
+    if draw_dict is not None:
+        for key, value in draw_dict.items():
+            dataframe = dataframe[dataframe[key].isin(value)]
     for names, name_df in dataframe.groupby('name'):
         new_df = pd.DataFrame()
         for param_names, values in name_df.groupby(parameters):
@@ -84,7 +90,7 @@ def update_research(research, pipeline, name, dataset):
     pipeline : Pipeline
 
     name : str
-        Pipeline name
+        Pipeline name.
     dataset : Dataset
 
     Returns
@@ -111,23 +117,23 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     test_pipeline : Pipeline
 
     res : Research
-        Research object with train and test pipelines
+        Research object with train and test pipelines.
     dataset : Dataset or list of Datasets
         Dataset to train and test pipelines or list of Dataset if cross validation is used.
     n_reps : int
-        Number of repetition Research with current parameters
+        Number of repetition Research with current parameters.
     n_iters : int
-        Number of iterations in one Research run
+        Number of iterations in one Research run.
     cross_val : None or int
-        Number of bins in cross valudation split
+        Number of bins in cross valudation split.
     dir_name : str
-        Name of directory with Researches (availble only when cross validation is used)
+        Name of directory with Researches (availble only when cross validation is used).
     research_name : str
-        Name of dir with Research results
+        Name of dir with Research results.
     train_name : str
-        Name of train pipeline
+        Name of train pipeline.
     test_name : str
-        Name of test pipeline
+        Name of test pipeline.
 
     Returns
     -------
@@ -171,7 +177,7 @@ def _load_research(research):
         return research.load_results()
     return Research().load(research).load_results(as_dataframe=True, use_alias=False)
 
-def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start=0):# pylint: disable=too-many-arguments
+def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start=0, draw_dict=None):# pylint: disable=too-many-arguments
     if cross_val:
         results = []
         if isinstance(research, str):
@@ -187,10 +193,10 @@ def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start
         results = _load_research(research)
 
     parameters = list(results.columns[:np.argmax(results.columns == 'repetition')])
-    all_names = split_df_by_name(results, parameters)
+    all_names = split_df_by_name(results, parameters, draw_dict)
     return all_names
 
-def draw_history(research, names, types_var, cross_val=None, aggr=False, iter_start=0): # pylint: disable=too-many-arguments
+def draw_history(research, names, types_var, cross_val=None, aggr=False, iter_start=0, draw_dict=None): # pylint: disable=too-many-locals,too-many-arguments
     """Draw plot with history of changes of function named `names` with values from column 'types_var'.
     If cross validation is used, parameter `hue` allows to change the name in legend.
 
@@ -203,15 +209,19 @@ def draw_history(research, names, types_var, cross_val=None, aggr=False, iter_st
     types_var : str or list of str
         Names where the function result saved.
     cross_val : None or int
-        Number of cross validation bins
+        Number of cross validation bins.
     aggr : bool, optional
         if True, cross validation reuslts will aggregate in one grap.
         Elsewhere for each cross validation will be drawn own line.
     iter_start : int
         All graph will be drawn from `iter_start` iteration.
+    draw_dict : dict
+        Only current params from dictionary will be drawn.
+        Keys : names of columns.
+        Values : The values of visualize params.
     """
     hue = 'number_of_cv' if cross_val is not None and cross_val > 1 else None
-    all_names = _prepare_results(research, hue, cross_val, aggr, iter_start)
+    all_names = _prepare_results(research, hue, cross_val, aggr, iter_start, draw_dict)
     grouped = [all_names.get(name) for name in names]
     for name, dframe in zip(names, grouped):
         nan_col = dframe.columns[dframe.isna().any()].tolist()
@@ -226,7 +236,7 @@ def draw_history(research, names, types_var, cross_val=None, aggr=False, iter_st
         graph.map(sns.lineplot, 'iteration', dtype).add_legend()
         plt.show()
 
-def draw_hisogram(research, name, type_var, cross_val=False):
+def draw_hisogram(research, name, type_var, cross_val=False, draw_dict=None):
     """Draw historgram of research results by given `name` of function and `type_var`.
 
     Parameters
@@ -234,13 +244,17 @@ def draw_hisogram(research, name, type_var, cross_val=False):
     research : Research
 
     name : str or list of str
-        Names of functions from Research
+        Names of functions from Research.
     type_var : str or list of str
         Names where the function result saved.
     cross_val : None or int
-        Number of cross validation bins
+        Number of cross validation bins.
+    draw_dict : dict
+        Only current params from dictionary will be drawn.
+        Keys : names of columns.
+        Values : The values of visualize params.
     """
-    data = _prepare_results(research, cross_val=cross_val)[name]
+    data = _prepare_results(research, cross_val=cross_val, draw_dict=draw_dict)[name]
     plt.figure(figsize=(10, 7))
     for numb, metric_list in data.groupby('parameters')[type_var]:
         sns.distplot(np.mean(list(metric_list), axis=0), label=str(numb))
