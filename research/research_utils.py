@@ -3,6 +3,7 @@ import os
 from copy import deepcopy
 from itertools import combinations
 
+import json
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -48,37 +49,6 @@ def create_datasets(path, batch, cross_val=None):
         dset_test = Dataset(index=index.create_subset(np.concatenate(test)), batch_class=RadialBatch)
         dsets.append([dset_train, dset_test])
     return dsets
-
-def split_df_by_name(dataframe, parameters, draw_dict=None):
-    """Split the dataframe on the parts with different values in `name` column.
-
-    Parameters
-    ----------
-    dataframe : pd.Dataframe
-        Result of Research.
-    parameters : list
-        Matched parameters from Research.
-    draw_dict : dict
-        Only current params from dictionary will be drawn.
-        Keys : names of columns.
-        Values : The values of visualize params.
-    Returns
-    -------
-        : dict
-        key : value of name column
-        value : resulted dataframe
-    """
-    all_names = {}
-    if draw_dict is not None:
-        for key, value in draw_dict.items():
-            dataframe = dataframe[dataframe[key].isin(value)]
-    for names, name_df in dataframe.groupby('name'):
-        new_df = pd.DataFrame()
-        for param_names, values in name_df.groupby(parameters):
-            values['parameters'] = str(param_names)[1:-1]
-            new_df = new_df.append(values)
-        all_names[names] = new_df
-    return all_names
 
 def update_research(research, pipeline, name, dataset):
     """Load given the data into research.
@@ -172,17 +142,62 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
         research_list.append(research)
     return research_list
 
+def split_df_by_name(dataframe, parameters, draw_dict=None):
+    """Split the dataframe on the parts with different values in `name` column.
+
+    Parameters
+    ----------
+    dataframe : pd.Dataframe
+        Result of Research.
+    parameters : list
+        Matched parameters from Research.
+    draw_dict : dict
+        Only current params from dictionary will be drawn.
+        Keys : names of columns.
+        Values : The values of visualize params.
+    Returns
+    -------
+        : dict
+        key : value of name column
+        value : resulted dataframe
+    """
+    all_names = {}
+    if draw_dict is not None:
+        for key, value in draw_dict.items():
+            dataframe = dataframe[dataframe[key].isin(value)]
+            if dataframe.empty:
+                raise ValueError("Incorrect column name {} or value {}.".format(key, value))
+    for names, name_df in dataframe.groupby('name'):
+        new_df = pd.DataFrame()
+        for param_names, values in name_df.groupby(parameters):
+            values['parameters'] = str(param_names)[1:-1]
+            new_df = new_df.append(values)
+        all_names[names] = new_df
+    return all_names
+
 def _load_research(research):
     if not isinstance(research, str):
         return research.load_results()
     return Research().load(research).load_results(as_dataframe=True, use_alias=False)
 
+def _get_parameters(research):
+    if isinstance(research, str):
+        with open(os.path.join(research, 'description', 'alias.json')) as res:
+            alias = json.load(res)
+        return list(alias.keys())
+
+    param_set = {}
+    for params_list in research.grid_config.alias():
+        for params in params_list:
+            param_set.update(params)
+    return list(param_set)
+
 def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start=0, draw_dict=None):# pylint: disable=too-many-arguments
-    if cross_val:
+    if cross_val or cross_val in [0, 1]:
         results = []
         if isinstance(research, str):
             research = list(map(lambda res_name: os.path.join(research, res_name), os.listdir(research)))
-
+        parameters = _get_parameters(research[0])
         for i, res in enumerate(research):
             loaded_res = _load_research(res)
             loaded_res[hue] = 0 if aggr else i
@@ -191,8 +206,7 @@ def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start
         results = pd.concat(results)
     else:
         results = _load_research(research)
-
-    parameters = list(results.columns[:np.argmax(results.columns == 'repetition')])
+        parameters = _get_parameters(research)
     all_names = split_df_by_name(results, parameters, draw_dict)
     return all_names
 
