@@ -2,6 +2,9 @@
 import numpy as np
 import scipy as sc
 
+from pylab import percentile
+from sklearn.ensemble import IsolationForest
+
 from . import radial_batch_tools as bt
 from .decorators import init_components
 from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
@@ -165,7 +168,7 @@ class RadialBatch(Batch):
     @action
     @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def drop_outliers(self, index, src=None, dst=None, **kwargs):
+    def drop_outliers_evr(self, index, src=None, dst=None, **kwargs):
         """ Finds and deletes outliers values.
         """
         _ = kwargs
@@ -180,6 +183,61 @@ class RadialBatch(Batch):
 
         getattr(self, dst[0])[i] = np.delete(time, outliers)
         getattr(self, dst[1])[i] = np.delete(derivative, outliers)
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init="indices", target="threads")
+    def drop_outliers_isoltree(self, index, src=None, dst=None, contamination=0.1, **kwargs):
+        """ Finds and deletes outliers values.
+        """
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
+
+        transposed_derivative = np.array([derivative]).T
+        isol = IsolationForest(behaviour='new', contamination=contamination)
+        isol.fit(transposed_derivative)
+        predictions = isol.predict(transposed_derivative)
+
+        getattr(self, dst[0])[i] = time[predictions == 1]
+        getattr(self, dst[1])[i] = derivative[predictions == 1]
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init="indices", target="threads")
+    def drop_outliers_percentile(self, index, src=None, dst=None, prob=0.5, size=3, **kwargs):
+        """ Finds and deletes outliers values.
+        """
+        def _percentile_func(value):
+            return percentile(value, 100*prob)
+
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
+
+        derivative = sc.ndimage.generic_filter(derivative, _percentile_func, size=size)
+
+        getattr(self, dst[0])[i] = time
+        getattr(self, dst[1])[i] = derivative
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init="indices", target="threads")
+    def drop_outliers_median(self, index, src=None, dst=None, size=5, **kwargs):
+        """ Finds and deletes outliers values.
+        """
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
+
+        getattr(self, dst[0])[i] = time
+        getattr(self, dst[1])[i] = sc.signal.medfilt(derivative, kernel_size=[size])
         return self
 
     @action
@@ -320,11 +378,11 @@ class RadialBatch(Batch):
             points.append(np.vstack(getattr(self, comp)))
         if not isinstance(dst, str):
             dst = dst[0]
-        setattr(self, dst, np.array(list(zip(*points))))
+        setattr(self, dst, np.array(list(zip(*points))).transpose(0, 2, 1))
         return self
 
     @action
-    def prepare_answer(self, src='target', **kwargs):
+    def make_target(self, src='target', **kwargs):
         """ Reshaped component co vector with shape = (-1, 1)."""
         _ = kwargs
         setattr(self, src, getattr(self, src).reshape(-1, 1))
