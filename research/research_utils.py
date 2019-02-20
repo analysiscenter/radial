@@ -279,9 +279,9 @@ def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
     plt.legend()
     plt.show()
 
-def print_results(research, names, types_var, cross_val=None, draw_dict=None, n_last=100, none=False):
+def print_results(research, names, types_var, cross_val=None, draw_dict=None, n_last=100, none=False): # pylint: disable=too-many-locals,too-many-arguments
     """Print table with mean values of 'names' columns from 'n_last' iterations.
-    NOTE : With cross validation works uncorrect.
+    NOTE : Works uncorrect with cross validation directories.
 
     Parameters
     ----------
