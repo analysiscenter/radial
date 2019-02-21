@@ -165,7 +165,7 @@ def split_df_by_name(dataframe, parameters, draw_dict=None):
     all_names = {}
     if draw_dict is not None:
         for key, value in draw_dict.items():
-            dataframe = dataframe[dataframe[key].isin(value)]
+            dataframe = dataframe[dataframe[key].isin(list([value]))]
             if dataframe.empty:
                 raise ValueError("Incorrect column name {} or value {}.".format(key, value))
     for names, name_df in dataframe.groupby('name'):
