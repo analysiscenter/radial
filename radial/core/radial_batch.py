@@ -2,6 +2,7 @@
 
 from functools import wraps
 
+import random
 import numpy as np
 import scipy as sc
 
@@ -497,16 +498,6 @@ class RadialBatch(Batch):
 
     @action
     @safe_src_dst_preprocess
-    def make_array(self, src=None, dst=None, **kwargs):
-        """ TODO: Should be rewritten as post function
-        """
-        _ = kwargs
-        for i, component in enumerate(src):
-            setattr(self, dst[i], np.stack(getattr(self, component)))
-        return self
-
-    @action
-    @safe_src_dst_preprocess
     def expand_dims(self, src=None, dst=None, **kwargs):
         """ Expands the shape of an array stored in a given component.
         Parameters
@@ -523,6 +514,46 @@ class RadialBatch(Batch):
         for i, component in enumerate(src):
             setattr(self, dst[i], getattr(self, component).reshape((-1, 1)))
         return self
+
+    @action
+    def hard_negative_sampling(self, statistics_name=None, fraction=0.5):
+        btch_size = len(self.indices)
+        if statistics_name and type(self.pipeline.get_variable(statistics_name)) == dict:
+            loss_history_dict = self.pipeline.get_variable(statistics_name)
+
+            sorted_by_value = sorted(loss_history_dict.items(), key=lambda kv: kv[1])
+            hard_count = int(btch_size * fraction)
+            hard_indices = set([x[0] for x in sorted_by_value[:hard_count]]) - set(self.indices)
+            new_index = list(self.indices[: btch_size - len(hard_indices)]) + list(hard_indices)
+            
+            random.shuffle(new_index)
+            batch = RadialBatch(index=self.pipeline.dataset.index.create_subset(new_index))
+            return batch
+        else:
+            return self
+
+    @action
+    def update_loss_history_dict(self, src='loss_history', dst='loss_history_dict'):
+        new_loss_history_dict = dict(zip(self.index.indices, self.pipeline.get_variable(src)))
+        if type(self.pipeline.get_variable(dst)) == dict:
+            new_loss_history_dict = {**new_loss_history_dict, **self.pipeline.get_variable(dst)}
+        self.pipeline.update_variable(dst, new_loss_history_dict,
+                                      mode='w')
+        return self
+
+    @action
+    @safe_src_dst_preprocess
+    def make_array(self, src=None, dst=None, **kwargs):
+        """ TODO: Should be rewritten as post function
+        """
+        _ = kwargs
+        for i, component in enumerate(src):
+            try:
+                setattr(self, dst[i], np.stack(getattr(self, component)))
+            except ValueError:
+                print('ACHTUNG! ', getattr(self, component))
+        return self
+
 
 class RadialImagesBatch(ImagesBatch, RadialBatch):
     """
