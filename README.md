@@ -15,9 +15,9 @@ Main features:
 
 > Radial is based on [BatchFlow](https://github.com/analysiscenter/batchflow).
 
-Radial has three modules [``core``](), [``preprocessing``]() and [``pipelines``]().
+Radial has three modules [``core``](https://github.com/analysiscenter/radial/tree/master/radial/core), [``preprocessing``](https://github.com/analysiscenter/radial/tree/master/radial/preprocessing) and [``pipelines``](https://github.com/analysiscenter/radial/tree/master/radial/pipelines).
 
-``core`` module contains ``RadialBatch`` class. This class include actions for loading data, make an normalization, approximation and others points preprocessing. These actions allows to create workflow that could be used to training machine learning models or neural networks.
+``core`` module contains ``RadialBatch`` class. This class include actions for loading data, normalize, approximation and doing other point preprocessing. These actions allows to create workflow that could be used to training machine learning models or neural networks.
 
 ``preprocessing`` module is designed to work with raw data. This module has two files for preprocessing:
 * ``xls_to_npz.py`` - comprise a function to convert raw data from XLS format to NPZ format
@@ -54,7 +54,7 @@ Done!
 
 #### Removing outliers
 
-The next step is optional. If you have a large dataset than dropping outliers in the pipeline could slow train process, to avoid this problem use `drop_outliers.py`. In the same time, this function available in the ``RadialBatch``.
+The next step is optional. If you have a large dataset than dropping outliers during the training could slow down the whole process. To avoid this problem use `drop_outliers.py`. In the same time, this function is available in the ``RadialBatch``.
 Anyway, following command allows you to run this function with NPZ-data:
 ```bash
 foo@bar:~$ python drop_outliers.py -l path/to/npz_data -s path/to/save
