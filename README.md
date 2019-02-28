@@ -9,7 +9,7 @@ Main features:
 * normalize, drop negatives, make a point approximation by 1d interpolation and logarithm of the time and derivative of the pressure.
 * making a cross validation approach to finding an optimal parameters of the neural network.
 * Train with models from zoo of state-of-the-art neural networks.
-* Predict on NPZ logarithmic data.
+* Predict on logarithmic data of NPZ format.
 
 ## About Radial
 
@@ -31,6 +31,8 @@ Radial has three modules [``core``](), [``preprocessing``]() and [``pipelines``]
 
 ### Preprocessing
 
+#### Preprocessing xls files
+
 To prepare data that stored in XLSX just run following commands:
 ```bash
 foo@bar:~$ python xls_to_npz.py -l path/to/whole_data.xlsx -s path/to/save
@@ -42,13 +44,17 @@ If you have a different files with train and test, use following command:
 foo@bar:~$ python xls_to_npz.py -l path/to/TEST_data.xlsx path/to/TRAIN_data.xlsx  -s path/to/save
 Done!
 ```
+
 or if you want to save test and train path of data to different directories.
+
 ```bash
 foo@bar:~$ python xls_to_npz.py -l path/to/TEST_data.xlsx path/to/TRAIN_data.xlsx  -s path/to/TEST_save path/to/TRAIN_save
 Done!
 ```
----
-The next step is optional. If you have a large dataset making drop outliers could slow train process, to avoid this problem use `drop_outliers.py`. In the same time, this function available in ``RadialBatch``.
+
+#### Removing outliers
+
+The next step is optional. If you have a large dataset than dropping outliers in the pipeline could slow train process, to avoid this problem use `drop_outliers.py`. In the same time, this function available in the ``RadialBatch``.
 Anyway, following command allows you to run this function with NPZ-data:
 ```bash
 foo@bar:~$ python drop_outliers.py -l path/to/npz_data -s path/to/save
@@ -70,7 +76,7 @@ Done!
 
 ### Train model
 
-Here is example of pipeline that load data and makes preprocessing and trains a model for 100 epochs:
+Here is an example of pipeline that load data, makes preprocessing and trains a model for 100 epochs:
 ```python
 train_pipeline = (
     Pipeline()
@@ -119,12 +125,13 @@ When cloning repo from GitHub use flag ``--recursive`` to make sure that ``batch
     git clone --recursive https://github.com/analysiscenter/radial.git
 
 
-## Citing CardIO
+## Citing Radial
 
 Please cite Radial in your publications if it helps your research.
 
 
-    Khudorozhkov R., Broilovskiy A., Mylzenova D., Podvyaznikov D. Radial library for deep research of finding exit point to the radial mode. 2019.
+    Khudorozhkov R., Broilovskiy A., Mylzenova D., Podvyaznikov D. Radial library for deep research
+    of finding exit point to the radial mode. 2019.
 
 ```
 @misc{cardio_2017_1156085,

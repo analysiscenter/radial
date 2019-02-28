@@ -1,2 +1,2 @@
 """Radial pipelines. """
-from pipelines import create_preprocess_pipeline, create_train_pipeline
+from .pipelines import create_preprocess_pipeline, create_train_pipeline

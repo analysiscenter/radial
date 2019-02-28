@@ -1,12 +1,10 @@
 """Preprocess xls data to npz. """
 import os
 import sys
-import xlrd
-
 import argparse
-import numpy as np
-from tqdm import tqdm
 
+import numpy as np
+import xlrd
 
 def parse_args():
     """Parse arguments from command line and run xls to npz function with given parameters."""
