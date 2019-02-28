@@ -4,7 +4,7 @@ import sys
 import argparse
 
 import numpy as np
-import xlrd
+import xlrd # pylint: disable=import-error
 
 def parse_args():
     """Parse arguments from command line and run xls to npz function with given parameters."""
