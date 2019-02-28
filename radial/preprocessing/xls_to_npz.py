@@ -1,3 +1,4 @@
+"""Preprocess xls data to npz. """
 import os
 import sys
 import xlrd
@@ -52,11 +53,10 @@ def xls_to_npz(path_from, path_to):
         for shnum in range(xls.nsheets):
             sheet = xls.sheet_by_index(shnum)
             np.savez(os.path.join(path_to, 'rr_{}'.format(shnum)),
-                     time = np.array([val for val in sheet.col_values(0)[2:] if val!='']),
-                     derivative = np.array([val for val in sheet.col_values(2)[2:] if val !='']),
-                     rig_type = sheet.col_values(4)[2],
-                     target = sheet.col_values(6)[2]
-                     )
+                     time=np.array([val for val in sheet.col_values(0)[2:] if val != '']),
+                     derivative=np.array([val for val in sheet.col_values(2)[2:] if val != '']),
+                     rig_type=sheet.col_values(4)[2],
+                     target=sheet.col_values(6)[2])
     else:
         save_path = []
         path_to = list(path_to) * len(path_from) if len(path_to) == 1 else path_to
@@ -70,11 +70,10 @@ def xls_to_npz(path_from, path_to):
             for shnum in range(xls.nsheets):
                 sheet = xls.sheet_by_index(shnum)
                 np.savez(os.path.join(save_path[num_p], 'rr_{}'.format(i)),
-                         time = np.array([val for val in sheet.col_values(0)[2:] if val!='']),
-                         derivative = np.array([val for val in sheet.col_values(2)[2:] if val !='']),
-                         rig_type = sheet.col_values(4)[2],
-                         target = sheet.col_values(6)[2]
-                         )
+                         time=np.array([val for val in sheet.col_values(0)[2:] if val != '']),
+                         derivative=np.array([val for val in sheet.col_values(2)[2:] if val != '']),
+                         rig_type=sheet.col_values(4)[2],
+                         target=sheet.col_values(6)[2])
                 i += 1
     print('Done!')
 

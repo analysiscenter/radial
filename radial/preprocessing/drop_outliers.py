@@ -1,3 +1,4 @@
+"""File with function that deleted outliers. """
 import os
 import sys
 
@@ -42,8 +43,8 @@ def load(path):
      : tuple
      (time, derivative, target, rig_type)
     """
-    d = dict(np.load(path))
-    return d['time'], d['derivative'], d['target'], d['rig_type']
+    data = dict(np.load(path))
+    return data['time'], data['derivative'], data['target'], data['rig_type']
 
 def drop_outliers(path_from, path_to, rewrite=False, contam=0.1):
     """Delete outliers by Isolation Forest.
@@ -76,15 +77,14 @@ def drop_outliers(path_from, path_to, rewrite=False, contam=0.1):
         for name in tqdm(data_names):
             file_name = os.path.join(path_f, name)
             time, derivative, target, rig_type = load(file_name)
-            X = np.array([derivative]).T
-            isol = IsolationForest(contamination=contam).fit(X)
-            pred = isol.predict(X)
+            x_data = np.array([derivative]).T
+            isol = IsolationForest(contamination=contam).fit(x_data)
+            pred = isol.predict(x_data)
             np.savez(os.path.join(path_t, name),
-                     time = time[pred == 1],
-                     derivative = derivative[pred == 1],
-                     rig_type = rig_type,
-                     target = target
-            )
+                     time=time[pred == 1],
+                     derivative=derivative[pred == 1],
+                     rig_type=rig_type,
+                     target=target)
     print("Done!")
 
 if __name__ == "__main__":
