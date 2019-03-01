@@ -2,6 +2,8 @@
 import numpy as np
 import scipy as sc
 
+from sklearn.ensemble import IsolationForest
+
 from . import radial_batch_tools as bt
 from .decorators import init_components
 from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
@@ -160,6 +162,30 @@ class RadialBatch(Batch):
 
         getattr(self, dst[0])[i] = time[mask]
         getattr(self, dst[1])[i] = derivative[mask]
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init="indices", target="threads")
+    def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
+        """Drop outliers using Isolation Forest algorithm.
+
+        Parameters
+        ----------
+        contam : float (from 0 to 0.5)
+            The amount of contamination of the data set
+        """
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
+
+        derivative = getattr(self, src[1])[i]
+        time = getattr(self, src[0])[i]
+
+        x_data = np.array([derivative]).T
+        isol = IsolationForest(contamination=contam).fit(x_data)
+        pred = isol.predict(x_data)
+        getattr(self, dst[0])[i] = time[pred == 1]
+        getattr(self, dst[1])[i] = derivative[pred == 1]
         return self
 
     @action
@@ -420,6 +446,29 @@ class RadialBatch(Batch):
                 getattr(self, dst[i])[pos] = new_data
             else:
                 raise ValueError('Src_range must be provided to denormalize component')
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init='indices')
+    def to_log10(self, ix, src=None, dst=None, **kwargs):
+        """Takes a decimal logarithm from `src` and saves the resulting value to `dst`
+
+        Parameters
+        ----------
+        src : src or list
+            Name of the component with data
+        dst : src or list
+            Name of the component to save the result
+        """
+        _ = kwargs
+        if isinstance(src, str):
+            src = [src]
+            dst = [dst]
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            comp_data = getattr(self, component)[pos]
+            getattr(self, dst[i])[pos] = np.log10(comp_data)
         return self
 
     @action

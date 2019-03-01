@@ -58,6 +58,13 @@ def drop_outliers(path_from, path_to, rewrite=False, contam=0.1):
     rewrite : bool
         if true, 'path_to' will be rewritten if exists
         else if 'path_to' exists the exeption will be raised
+    contam : float (from 0 to 0.5)
+        The amount of contamination of the data set
+
+    Raises
+    ------
+    ValueError
+        if path_from > 1 and path_to != 1.
     """
     if len(path_from) != len(path_to):
         if len(path_to) != 1:
