@@ -324,6 +324,7 @@ def print_results(research, names, types_var, cross_val=None, draw_dict=None, n_
                     rep_val = np.concatenate(rep_val)
                 values.append(np.nanmean(rep_val) if none else np.mean(rep_val))
             printed[param][name] = np.mean(values)
+            printed[param][name + ' std'] = np.std(values)
     val = []
     col = ['params'] + list(list(printed.items())[0][1].keys())
     for key, val_dict in printed.items():
