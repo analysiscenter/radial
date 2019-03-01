@@ -26,7 +26,6 @@ setup(
         'pandas>=0.23.4',
         'seaborn>=0.9.0',
         'tqdm>=4.25.0',
-        'json>=2.0.9',
         'tabulate>=0.8.2',
         'argparse>=1.1',
         'pytest>=4.0.0'
