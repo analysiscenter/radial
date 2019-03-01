@@ -1,4 +1,5 @@
 """ Tools for RadialBatch """
+import os
 
 import numpy as np
 import seaborn as sns
@@ -98,3 +99,7 @@ def load_npz(path=None, components=None, *args, **kwargs):
     data['derivative'] = derivative[order]
 
     return [data[comp] for comp in components]
+
+
+def log(*args):
+    return np.array(list(map(np.log10, args)))
