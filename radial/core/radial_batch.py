@@ -59,13 +59,15 @@ class RadialBatch(Batch):
             raise RuntimeError("Cannot assemble the batch", all_errors)
 
     @action
-    def load(self, fmt=None, components=None, *args, **kwargs):
+    def load(self, src=None, fmt=None, components=None, *args, **kwargs):
         """ Load given batch components.
 
         This method supports loading of data from npz format.
 
         Parameters
         ----------
+        src: str, optional
+             an array with data
         fmt : str, optional
             Source format.
         components : str or array-like, optional
@@ -82,7 +84,21 @@ class RadialBatch(Batch):
         if components is None:
             components = self.components
 
-        return self._load(fmt, components)
+        if fmt is None:
+            self.put_into_data(src, components)
+            self._sort(components)
+        else:
+            self._load(fmt, components)
+
+        return self
+
+    @inbatch_parallel(init='indices')
+    def _sort(self, index, components):
+        i = self.get_pos(None, 'time', index)
+        time_mask = np.argsort(getattr(self, 'time')[i])
+        for component in components:
+            data = getattr(self, component)[i]
+            getattr(self, component)[i] = data[time_mask]
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, **kwargs):
@@ -154,7 +170,6 @@ class RadialBatch(Batch):
         i = self.get_pos(None, src[0], index)
         time = getattr(self, src[0])[i]
         derivative = getattr(self, src[1])[i]
-
         mask = derivative > 0
 
         if sum(mask) == 0:
@@ -259,7 +274,6 @@ class RadialBatch(Batch):
         tmin, tmax = np.min(time), np.max(time)
         sample_times = samples * (tmax - tmin) + tmin
         sample_times.sort(axis=-1)
-
         sample_derivatives = interpolater(sample_times)
 
         getattr(self, dst[0])[i] = np.array(sample_times)
