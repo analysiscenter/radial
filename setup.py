@@ -19,6 +19,7 @@ setup(
     platforms='any',
     install_requires=[
         'numpy>=1.15.4',
+        'scipy>=1.1.0',
         'scikit-learn>=0.20.0',
         'matplotlib>=3.0.1',
         'dill>=0.2.8.2',
@@ -28,7 +29,8 @@ setup(
         'tqdm>=4.25.0',
         'tabulate>=0.8.2',
         'argparse>=1.1',
-        'pytest>=4.0.0'
+        'pytest>=4.0.0',
+        'psutil>=5.5.1'
     ],
     extras_require={
         'tensorflow': ['tensorflow>=1.12'],
