@@ -473,6 +473,23 @@ class RadialBatch(Batch):
 
     @action
     @init_components
+    @inbatch_parallel(init='indices')
+    def clip_values(self, ix, src, dst, **kwargs):
+        """Clip values from `src` to 0, 1 and save it to `dst`
+        """
+        _ = kwargs
+        if isinstance(src, str):
+            src = [src]
+            dst = [dst]
+
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            pred = getattr(self, component)[pos]
+            getattr(self, dst[i])[pos] = np.clip(pred, 0, 1)
+        return self
+
+    @action
+    @init_components
     def make_array(self, src=None, dst=None, **kwargs):
         """ TODO: Should be rewritten as post function
         """
