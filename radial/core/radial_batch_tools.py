@@ -102,4 +102,5 @@ def load_npz(path=None, components=None, *args, **kwargs):
 
 
 def log(*args):
+    """ Compute logarithm for apply transoform method """
     return np.array(list(map(np.log10, args)))

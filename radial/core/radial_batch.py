@@ -554,6 +554,22 @@ class RadialBatch(Batch):
                 print('ACHTUNG! ', getattr(self, component))
         return self
 
+    @action
+    @safe_src_dst_preprocess
+    @inbatch_parallel(init='indices')
+    def clip_values(self, ix, src, dst, **kwargs):
+        """Clip values from `src` to 0, 1 and save it to `dst`
+        """
+        _ = kwargs
+        if isinstance(src, str):
+            src = [src]
+            dst = [dst]
+
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            pred = getattr(self, component)[pos]
+            getattr(self, dst[i])[pos] = np.clip(pred, 0, 1)
+        return self
 
 class RadialImagesBatch(ImagesBatch, RadialBatch):
     """

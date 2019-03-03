@@ -77,8 +77,9 @@ def _update_research(research, pipeline, name, dataset):
         research.executables[name[i]] = executable
     return research
 
-def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps, n_iters, cross_val=None, # pylint: disable=too-many-arguments, too-many-locals
-                             dir_name='research_cv', research_name='research', train_name='train', test_name='test'):
+def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps,
+                             n_iters, cross_val=None, dir_name='research_cv', research_name='research',
+                             train_name='train', test_name='test'): # pylint: disable=too-many-arguments, too-many-locals
     """Execute research with given parameters.
 
     Parameters
@@ -129,7 +130,7 @@ In [ ]:
         res_list = os.listdir('./')
         names = np.array(res_list)[list(map(lambda a: dir_name in a, res_list))]
         for name in sorted(names, reverse=True):
-            if not '.' in name:
+            if '.' not in name:
                 index = 1 if name[-1] == 'v' else int(name[-1])
                 dir_name = dir_name + '_%d'%(index+1)
                 os.makedirs(dir_name)
@@ -214,9 +215,11 @@ def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start
     all_names = split_df_by_name(results, parameters, draw_dict)
     return all_names
 
-def draw_history(research, names, types_var, cross_val=None, aggr=False, iter_start=0, draw_dict=None): # pylint: disable=too-many-locals,too-many-arguments
-    """Draw plot with history of changes of function named `names` with values from column 'types_var'.
-    If cross validation is used, parameter `hue` allows to change the name in legend.
+def draw_history(research, names, types_var, cross_val=None, aggr=False,
+                 iter_start=0, draw_dict=None): # pylint: disable=too-many-locals,too-many-arguments
+    """Draw plot with history of changes of function named `names` with values from
+    column 'types_var'. If cross validation is used, parameter `hue` allows to change
+    the name in legend.
 
     Parameters
     ----------
@@ -282,7 +285,8 @@ def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
     plt.legend()
     plt.show()
 
-def print_results(research, names, types_var, cross_val=None, draw_dict=None, n_last=100, none=False): # pylint: disable=too-many-locals,too-many-arguments
+def print_results(research, names, types_var, cross_val=None, draw_dict=None,
+                  n_last=100, none=False): # pylint: disable=too-many-locals,too-many-arguments
     """Print table with mean values of 'names' columns from 'n_last' iterations.
     NOTE : Works uncorrect with cross validation directories.
 
