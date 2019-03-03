@@ -150,13 +150,12 @@ class RadialBatch(Batch):
         """
         _ = args, kwargs
         components = [components] if isinstance(components, str) else components
-
-        if fmt == 'csv':
-            return super()._load_table(fmt=fmt, components=components, *args, **kwargs)
         if fmt == 'npz':
             if components is None:
                 components = ["time", "derivative", "rig_type", "target"]
             return self._load(fmt, components)
+        else:
+            raise NotImplementedError
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
