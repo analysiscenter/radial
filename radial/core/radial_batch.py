@@ -154,8 +154,7 @@ class RadialBatch(Batch):
             if components is None:
                 components = ["time", "derivative", "rig_type", "target"]
             return self._load(fmt, components)
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
