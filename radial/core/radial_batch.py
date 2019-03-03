@@ -152,7 +152,7 @@ class RadialBatch(Batch):
         components = [components] if isinstance(components, str) else components
 
         if fmt == 'csv':
-            return self._load_table(fmt=fmt, components=components, *args, **kwargs)
+            return super()._load_table(fmt=fmt, components=components, *args, **kwargs)
         if fmt == 'npz':
             if components is None:
                 components = ["time", "derivative", "rig_type", "target"]
@@ -529,12 +529,12 @@ class RadialBatch(Batch):
         self
         """
         btch_size = len(self.indices)
-        if statistics_name and type(self.pipeline.get_variable(statistics_name)) == dict:
+        if statistics_name and isinstance(self.pipeline.get_variable(statistics_name), dict):
             loss_history_dict = self.pipeline.get_variable(statistics_name)
 
             sorted_by_value = sorted(loss_history_dict.items(), key=lambda kv: kv[1])
             hard_count = int(btch_size * fraction)
-            hard_indices = set([x[0] for x in sorted_by_value[:hard_count]]) - set(self.indices)
+            hard_indices = {x[0] for x in sorted_by_value[:hard_count]} - {self.indices}
             new_index = list(self.indices[: btch_size - len(hard_indices)]) + list(hard_indices)
 
             random.shuffle(new_index)
@@ -651,7 +651,7 @@ class RadialImagesBatch(ImagesBatch, RadialBatch):
 
         components = [components] if isinstance(components, str) else components
 
-        if fmt == 'npz' or fmt == 'csv':
+        if fmt in ['npz', 'csv']:
             RadialBatch.load(self, fmt=fmt, components=components, *args, **kwargs)
         elif fmt == 'image':
             ImagesBatch.load(self, fmt=fmt, components=components, *args, **kwargs)
