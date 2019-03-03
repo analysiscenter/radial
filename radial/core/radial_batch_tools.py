@@ -29,7 +29,6 @@ def save_model(iteration, experiment, pipeline, model_name, path='./'):
     path = os.path.join(path, experiment[pipeline].config.alias(as_string=True) + '_' + str(iteration))
     pipeline = experiment[pipeline].pipeline
     pipeline.save_model(model_name, path)
-    return
 
 def get_ape(iteration, experiment, pipeline):
     """ Calculate percentage of absolute percentage error."""

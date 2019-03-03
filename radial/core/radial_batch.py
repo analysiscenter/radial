@@ -152,13 +152,11 @@ class RadialBatch(Batch):
         components = [components] if isinstance(components, str) else components
 
         if fmt == 'csv':
-            super()._load_table(fmt=fmt, components=components, *args, **kwargs)
-            return self
-        elif fmt == 'npz':
+            return self._load_table(fmt=fmt, components=components, *args, **kwargs)
+        if fmt == 'npz':
             if components is None:
                 components = ["time", "derivative", "rig_type", "target"]
             return self._load(fmt, components)
-        
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
@@ -517,6 +515,19 @@ class RadialBatch(Batch):
 
     @action
     def hard_negative_sampling(self, statistics_name=None, fraction=0.5):
+        """ Recreate batch with new indices corresponding to the largest loss
+        value on the previous iterations.
+        Parameters
+        ----------
+        statistics_name : str
+            name of the pipeline variable where the dict with the index and
+            corresponding loss values is stored.
+        fraction : float in [0, 1]
+            A fraction of the hard negative examples in the new batch.
+        Returns
+        -------
+        self
+        """
         btch_size = len(self.indices)
         if statistics_name and type(self.pipeline.get_variable(statistics_name)) == dict:
             loss_history_dict = self.pipeline.get_variable(statistics_name)
@@ -525,17 +536,31 @@ class RadialBatch(Batch):
             hard_count = int(btch_size * fraction)
             hard_indices = set([x[0] for x in sorted_by_value[:hard_count]]) - set(self.indices)
             new_index = list(self.indices[: btch_size - len(hard_indices)]) + list(hard_indices)
-            
+
             random.shuffle(new_index)
             batch = RadialBatch(index=self.pipeline.dataset.index.create_subset(new_index))
             return batch
-        else:
-            return self
+        return self
 
     @action
     def update_loss_history_dict(self, src='loss_history', dst='loss_history_dict'):
+        """ Update pipeline variable dst that is dict with key - element's index and
+        corresponding value, i.e. squarred error on that element from src
+        Parameters
+        ----------
+        src : str
+            name of the pipeline variable where element-wise statistics
+            (e.g. unaggreagated loss) for the batch is stored.
+            It can be a list or np.array of length batch_size.
+        dst : str
+            name of the pipeline variable where the dict with the index and
+            corresponding values is stored.
+        Returns
+        -------
+        self
+        """
         new_loss_history_dict = dict(zip(self.index.indices, self.pipeline.get_variable(src)))
-        if type(self.pipeline.get_variable(dst)) == dict:
+        if isinstance(self.pipeline.get_variable(dst), dict):
             new_loss_history_dict = {**new_loss_history_dict, **self.pipeline.get_variable(dst)}
         self.pipeline.update_variable(dst, new_loss_history_dict,
                                       mode='w')
@@ -603,6 +628,27 @@ class RadialImagesBatch(ImagesBatch, RadialBatch):
 
     @action
     def load(self, fmt=None, components=None, *args, **kwargs):
+        """
+        Load given components from file.
+
+        Parameters
+        ----------
+        fmt : str, optional
+            Source format.
+        components : iterable, optional
+
+        Returns
+        -------
+        batch : RadialImagesBatchs
+            Batch with loaded components. Changes batch data inplace.
+
+        Raises
+        ------
+        ValueError
+            If source path is not specified and batch's ``index`` is not a
+            ``FilesIndex``.
+        """
+
         components = [components] if isinstance(components, str) else components
 
         if fmt == 'npz' or fmt == 'csv':
