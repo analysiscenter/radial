@@ -8,6 +8,7 @@ import scipy as sc
 
 from .decorators import init_components
 from . import radial_batch_tools as bt
+from .decorators import init_components
 from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
 
 class RadialBatch(Batch):
@@ -42,11 +43,11 @@ class RadialBatch(Batch):
 
     @property
     def array_of_nones(self):
-        """1-D ndarray: ``NumPy`` array with ``None`` values."""
+        """ 1-D ndarray: ``NumPy`` array with ``None`` values."""
         return np.array([None] * len(self.index))
 
     def _reraise_exceptions(self, results):
-        """Reraise all exceptions in the ``results`` list.
+        """ Reraise all exceptions in the ``results`` list.
 
         Parameters
         ----------
@@ -97,9 +98,8 @@ class RadialBatch(Batch):
         return self
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
-    def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
-        """
-        Load given components from file.
+    def _load(self, indice, fmt=None, components=None, *args, **kwargs):
+        """ Load given components from file.
 
         Parameters
         ----------
@@ -128,7 +128,7 @@ class RadialBatch(Batch):
         return loaders[fmt](path, components, *args, **kwargs)
 
     def _assemble_load(self, results, *args, **kwargs):
-        """Concatenate results of different workers and update ``self``.
+        """ Concatenate results of different workers and update ``self``.
 
         Parameters
         ----------
@@ -174,6 +174,30 @@ class RadialBatch(Batch):
 
         getattr(self, dst[0])[i] = time[mask]
         getattr(self, dst[1])[i] = derivative[mask]
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init="indices", target="threads")
+    def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
+        """Drop outliers using Isolation Forest algorithm.
+
+        Parameters
+        ----------
+        contam : float (from 0 to 0.5)
+            The amount of contamination of the data set
+        """
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
+
+        derivative = getattr(self, src[1])[i]
+        time = getattr(self, src[0])[i]
+
+        x_data = np.array([derivative]).T
+        isol = IsolationForest(contamination=contam).fit(x_data)
+        pred = isol.predict(x_data)
+        getattr(self, dst[0])[i] = time[pred == 1]
+        getattr(self, dst[1])[i] = derivative[pred == 1]
         return self
 
     @action
@@ -255,7 +279,7 @@ class RadialBatch(Batch):
 
     @action
     def unstack_samples(self):
-        """Create a new batch in which each element of `time` and `derivative`
+        """ Create a new batch in which each element of `time` and `derivative`
         along axis 0 is considered as a separate signal.
 
         This method creates a new batch and unstacks components `time` and
@@ -301,31 +325,33 @@ class RadialBatch(Batch):
             val = [elem for elem, n in zip(component, n_reps) for _ in range(n)]
             val = np.array(val + [None])[:-1]
             setattr(batch, component_name, val)
-
         return batch
 
     @action
     @init_components
-    @inbatch_parallel(init="indices", target="threads")
-    def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
-        """Drop outliers using Isolation Forest algorithm.
-
-        Parameters
-        ----------
-        contam : float (from 0 to 0.5)
-            The amount of contamination of the data set
-        """
+    def make_points(self, src=None, dst=None, **kwargs):
+        """ Generated new component with name `dst` with value from `src`."""
         _ = kwargs
-        i = self.get_pos(None, src[0], index)
+        points = []
+        for comp in src:
+            points.append(np.vstack(getattr(self, comp)))
+        if not isinstance(dst, str):
+            dst = dst[0]
+        setattr(self, dst, np.array(list(zip(*points))).transpose(0, 2, 1))
+        return self
 
-        derivative = getattr(self, src[1])[i]
-        time = getattr(self, src[0])[i]
+    @action
+    def make_target(self, src='target', **kwargs):
+        """ Reshaped component co vector with shape = (-1, 1)."""
+        _ = kwargs
+        setattr(self, src, getattr(self, src).reshape(-1, 1))
+        return self
 
-        x_data = np.array([derivative]).T
-        isol = IsolationForest(contamination=contam).fit(x_data)
-        pred = isol.predict(x_data)
-        getattr(self, dst[0])[i] = time[pred == 1]
-        getattr(self, dst[1])[i] = derivative[pred == 1]
+    @action
+    def prepare_answer(self, src='target', **kwargs):
+        """ Reshaped component co vector with shape = (-1, 1)."""
+        _ = kwargs
+        setattr(self, src, getattr(self, src).reshape(-1, 1))
         return self
 
     @action
@@ -355,6 +381,7 @@ class RadialBatch(Batch):
         self
 
         """
+        _ = kwargs
         for i, component in enumerate(src):
             pos = self.get_pos(None, component, ix)
             comp_data = getattr(self, component)[pos]
@@ -364,6 +391,7 @@ class RadialBatch(Batch):
                 min_value, scale_value = np.min(comp_data), (np.max(comp_data) - np.min(comp_data))
             new_data = (comp_data - min_value) / scale_value
             getattr(self, dst[i])[pos] = new_data
+
             if dst_range[i]:
                 getattr(self, dst_range[i])[pos] = [min_value, scale_value]
         return self
@@ -425,6 +453,7 @@ class RadialBatch(Batch):
         self
         """
         _ = kwargs
+
         for i, component in enumerate(src):
             pos = self.get_pos(None, component, ix)
             comp_data = getattr(self, component)[pos]
@@ -435,6 +464,16 @@ class RadialBatch(Batch):
                 getattr(self, dst[i])[pos] = new_data
             else:
                 raise ValueError('Src_range must be provided to denormalize component')
+        return self
+
+    @action
+    @init_components
+    def make_array(self, src=None, dst=None, **kwargs):
+        """ TODO: Should be rewritten as post function
+        """
+        _ = kwargs
+        for i, component in enumerate(src):
+            setattr(self, dst[i], np.stack(getattr(self, component)))
         return self
 
     @action
