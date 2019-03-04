@@ -38,10 +38,7 @@ class RadialBatch(Batch):
         self.target = self.array_of_nones
         self.predictions = self.array_of_nones
 
-    @property
-    def components(self):
-        """tuple of str: Data components names."""
-        return "time", "derivative", "rig_type", "target", "predictions"
+        components = "time", "derivative", "rig_type", "target", "predictions"
 
     @property
     def array_of_nones(self):
@@ -588,19 +585,6 @@ class RadialBatch(Batch):
             new_loss_history_dict = {**new_loss_history_dict, **self.pipeline.get_variable(dst)}
         self.pipeline.update_variable(dst, new_loss_history_dict,
                                       mode='w')
-        return self
-
-    @action
-    @init_components
-    def make_array(self, src=None, dst=None, **kwargs):
-        """ TODO: Should be rewritten as post function
-        """
-        _ = kwargs
-        for i, component in enumerate(src):
-            try:
-                setattr(self, dst[i], np.stack(getattr(self, component)))
-            except ValueError:
-                print('ACHTUNG! ', getattr(self, component))
         return self
 
     @action
