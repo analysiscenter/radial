@@ -1,12 +1,9 @@
 """ Batch class for radial regime regression. """
 
-from functools import wraps
-
 import random
 import numpy as np
 import scipy as sc
 
-from .decorators import init_components
 from sklearn.ensemble import IsolationForest
 
 from . import radial_batch_tools as bt
@@ -38,7 +35,7 @@ class RadialBatch(Batch):
         self.target = self.array_of_nones
         self.predictions = self.array_of_nones
 
-        components = "time", "derivative", "rig_type", "target", "predictions"
+    components = "time", "derivative", "rig_type", "target", "predictions"
 
     @property
     def array_of_nones(self):
@@ -585,21 +582,4 @@ class RadialBatch(Batch):
             new_loss_history_dict = {**new_loss_history_dict, **self.pipeline.get_variable(dst)}
         self.pipeline.update_variable(dst, new_loss_history_dict,
                                       mode='w')
-        return self
-
-    @action
-    @init_components
-    @inbatch_parallel(init='indices')
-    def clip_values(self, ix, src, dst, **kwargs):
-        """Clip values from `src` to 0, 1 and save it to `dst`
-        """
-        _ = kwargs
-        if isinstance(src, str):
-            src = [src]
-            dst = [dst]
-
-        for i, component in enumerate(src):
-            pos = self.get_pos(None, component, ix)
-            pred = getattr(self, component)[pos]
-            getattr(self, dst[i])[pos] = np.clip(pred, 0, 1)
         return self
