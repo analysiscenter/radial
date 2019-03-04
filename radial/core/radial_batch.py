@@ -35,7 +35,7 @@ class RadialBatch(Batch):
         self.target = self.array_of_nones
         self.predictions = self.array_of_nones
 
-    components = "time", "derivative", "rig_type", "target", "predictions"
+    components = "time", "derivative", "rig_type", "target"
 
     @property
     def array_of_nones(self):
@@ -552,7 +552,7 @@ class RadialBatch(Batch):
 
             sorted_by_value = sorted(loss_history_dict.items(), key=lambda kv: kv[1])
             hard_count = int(btch_size * fraction)
-            hard_indices = {x[0] for x in sorted_by_value[:hard_count]} - {self.indices}
+            hard_indices = {x[0] for x in sorted_by_value[:hard_count]} - set(self.indices)
             new_index = list(self.indices[: btch_size - len(hard_indices)]) + list(hard_indices)
 
             random.shuffle(new_index)
