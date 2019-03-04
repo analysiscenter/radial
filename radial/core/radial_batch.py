@@ -6,77 +6,9 @@ import random
 import numpy as np
 import scipy as sc
 
+from .decorators import init_components
 from . import radial_batch_tools as bt
-from ..batchflow import Batch, ImagesBatch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
-
-def _safe_make_array(dst, len_src):
-    """ Makes array from dst data. Raises exception if length of resulting array
-    is not equal to len_src. If dst is None returns array of None of length len_src.
-    Parameters
-    ----------
-    dst : str or None or list, tuple, np.ndarray of str
-        Contains names of batch component(s) to be processed
-    len_src : int
-        Desired length of resulting array
-    Returns
-    -------
-    np.array
-    """
-    if not isinstance(dst, (list, tuple, np.ndarray)):
-        if not dst:
-            dst = np.array([None] * len_src)
-        else:
-            dst = np.asarray(dst).reshape(-1)
-    elif not len(dst) == len_src:
-        raise ValueError('Number of given components must be equal')
-    return dst
-
-def safe_src_dst_preprocess(method):
-    """ Decorator used for preprocessing  kwargs such as src, dst, src_range, dst_range.
-    Modifies str to list of str, inserts default values and raises ValueError if mandatory
-    parameters are missing.
-
-    Parameters
-    ----------
-    method : method to be decorated
-
-    Returns
-    -------
-    Method with updated kwargs
-    """
-    @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """ Wrapper
-        """
-        src = kwargs.get('src', None)
-        dst = kwargs.get('dst', None)
-        src_range = kwargs.get('src_range', None)
-        dst_range = kwargs.get('dst_range', None)
-
-        src = np.asarray(src).reshape(-1)
-        dst = _safe_make_array(dst, len(src))
-
-        src_range = _safe_make_array(src_range, len(src))
-        dst_range = _safe_make_array(dst_range, len(src))
-
-        for i, component in enumerate(src):
-            if not component:
-                raise ValueError('Required argument `src` (pos 1) not found')
-            if not hasattr(self, component):
-                raise ValueError('Component passed in src does not exist')
-            if not dst[i]:
-                dst[i] = component
-            if not hasattr(self, dst[i]):
-                setattr(self, dst[i], self.array_of_nones)
-
-            if src_range[i] and not hasattr(self, src_range[i]):
-                raise ValueError('Component provided in src_range does not exist')
-            if dst_range[i] and not hasattr(self, dst_range[i]):
-                setattr(self, dst_range[i], self.array_of_nones)
-        kwargs.update(src=src, dst=dst, src_range=src_range, dst_range=dst_range)
-        return method(self, *args, **kwargs)
-    return wrapper
-
+from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
 
 class RadialBatch(Batch):
     """
@@ -131,13 +63,15 @@ class RadialBatch(Batch):
             raise RuntimeError("Cannot assemble the batch", all_errors)
 
     @action
-    def load(self, fmt=None, components=None, *args, **kwargs):
-        """Load given batch components.
+    def load(self, src=None, fmt=None, components=None, *args, **kwargs):
+        """ Load given batch components.
 
         This method supports loading of data from npz format.
 
         Parameters
         ----------
+        src: str, optional
+             an array with data
         fmt : str, optional
             Source format.
         components : str or array-like, optional
@@ -149,12 +83,18 @@ class RadialBatch(Batch):
             Batch with loaded components. Changes batch data inplace.
         """
         _ = args, kwargs
-        components = [components] if isinstance(components, str) else components
-        if fmt == 'npz':
-            if components is None:
-                components = ["time", "derivative", "rig_type", "target"]
-            return self._load(fmt, components)
-        raise NotImplementedError
+        if isinstance(components, str):
+            components = list(components)
+        if components is None:
+            components = self.components
+
+        if fmt is None:
+            self.put_into_data(src, components)
+            self._sort(components)
+        else:
+            self._load(fmt, components)
+
+        return self
 
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, ** kwargs):
@@ -213,34 +153,34 @@ class RadialBatch(Batch):
         return self
 
     @action
+    @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def drop_negative(self, index):
-        """
-        Leaves only positive values.
+    def drop_negative(self, index, src=None, dst=None, **kwargs):
+        """ Leaves only positive values.
 
         Raises
         ------
         ValueError
             If all values in derivative component are negative.
         """
-        i = self.get_pos(None, 'time', index)
-        time = self.time[i]
-        derivative = self.derivative[i]
-
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
         mask = derivative > 0
 
         if sum(mask) == 0:
             raise ValueError("All values in derivative {} are negative!".format(index))
 
-        self.time[i] = time[mask]
-        self.derivative[i] = derivative[mask]
-
+        getattr(self, dst[0])[i] = time[mask]
+        getattr(self, dst[1])[i] = derivative[mask]
         return self
 
     @action
+    @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def get_samples(self, index, n_points, n_samples=1,
-                    sampler=None, interpolate='linear', seed=None):
+    def get_samples(self, index, n_points, n_samples=1, sampler=None, # pylint: disable=too-many-arguments
+                    src=None, dst=None, interpolate='linear', seed=None, **kwargs):
         """ Draws samples from the interpolation of time and derivative components.
 
         Performs interpolation of the `derivative` on time using
@@ -285,12 +225,13 @@ class RadialBatch(Batch):
         parameters to this function should be passed via kwargs.
         See ``beta_sampler`` method for example.
         """
+        _ = kwargs
         if seed:
             np.random.seed(seed)
 
-        i = self.get_pos(None, 'time', index)
-        time = self.time[i]
-        derivative = self.derivative[i]
+        i = self.get_pos(None, src[0], index)
+        time = getattr(self, src[0])[i]
+        derivative = getattr(self, src[1])[i]
 
         interpolater = sc.interpolate.interp1d(time, derivative, kind=interpolate,
                                                bounds_error=True, assume_sorted=True)
@@ -306,11 +247,10 @@ class RadialBatch(Batch):
         tmin, tmax = np.min(time), np.max(time)
         sample_times = samples * (tmax - tmin) + tmin
         sample_times.sort(axis=-1)
-
         sample_derivatives = interpolater(sample_times)
 
-        self.time[i] = np.array(sample_times)
-        self.derivative[i] = np.array(sample_derivatives)
+        getattr(self, dst[0])[i] = np.array(sample_times)
+        getattr(self, dst[1])[i] = np.array(sample_derivatives)
         return self
 
     @action
@@ -365,28 +305,33 @@ class RadialBatch(Batch):
         return batch
 
     @action
+    @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def drop_outliers(self, index):
-        """
-        Finds and deletes outliers values.
-        """
-        i = self.get_pos(None, 'time', index)
-        time = self.time[i]
-        derivative = self.derivative[i]
+    def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
+        """Drop outliers using Isolation Forest algorithm.
 
-        neighbors = np.diff(time)
-        mean_elems = np.array([neighbors[i]/np.mean(np.delete(neighbors, i)) for i in range(len(time)-1)])
-        outliers = np.where(mean_elems > 70)[0]
-        outliers = np.arange(outliers[0], time.shape) if outliers.shape[0] > 0 else np.empty(0)
+        Parameters
+        ----------
+        contam : float (from 0 to 0.5)
+            The amount of contamination of the data set
+        """
+        _ = kwargs
+        i = self.get_pos(None, src[0], index)
 
-        self.time[i] = np.delete(time, outliers)
-        self.derivative[i] = np.delete(derivative, outliers)
+        derivative = getattr(self, src[1])[i]
+        time = getattr(self, src[0])[i]
+
+        x_data = np.array([derivative]).T
+        isol = IsolationForest(contamination=contam).fit(x_data)
+        pred = isol.predict(x_data)
+        getattr(self, dst[0])[i] = time[pred == 1]
+        getattr(self, dst[1])[i] = derivative[pred == 1]
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
-    def normalize(self, ix, src=None, dst=None, src_range=None, dst_range=None):
+    def normalize(self, ix, src=None, dst=None, src_range=None, dst_range=None, **kwargs):
         """ Normalizes data element-wise to range [0, 1] by exctracting
         min(data) and dividing by (max(data)-min(data)).
         Parameters
@@ -424,7 +369,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
     def make_grid_data(self, ix, src=None, dst=None, grid_size=500, **kwargs):
         """ Makes grid
@@ -460,7 +405,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
     def denormalize(self, ix, src=None, dst=None, src_range=None, **kwargs):
         """ Denormalizes component to initial range.
@@ -493,7 +438,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     def expand_dims(self, src=None, dst=None, **kwargs):
         """ Expands the shape of an array stored in a given component.
         Parameters
@@ -565,7 +510,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     def make_array(self, src=None, dst=None, **kwargs):
         """ TODO: Should be rewritten as post function
         """
@@ -578,7 +523,7 @@ class RadialBatch(Batch):
         return self
 
     @action
-    @safe_src_dst_preprocess
+    @init_components
     @inbatch_parallel(init='indices')
     def clip_values(self, ix, src, dst, **kwargs):
         """Clip values from `src` to 0, 1 and save it to `dst`
@@ -592,65 +537,4 @@ class RadialBatch(Batch):
             pos = self.get_pos(None, component, ix)
             pred = getattr(self, component)[pos]
             getattr(self, dst[i])[pos] = np.clip(pred, 0, 1)
-        return self
-
-class RadialImagesBatch(ImagesBatch, RadialBatch):
-    """
-    Batch class that stores multiple time series along with other parameters
-    for radial flow regime regression.
-
-    Parameters
-    ----------
-    index : DatasetIndex
-        Unique identifiers of rig data in the batch.
-    preloaded : tuple, optional
-        Data to put in the batch if given. Defaults to ``None``.
-
-    Attributes
-    ----------
-    index : DatasetIndex
-        Unique identifiers of rig data in the batch.
-    """
-    def __init__(self, index, preloaded=None):
-        super().__init__(index, preloaded)
-        self.time = self.array_of_nones
-        self.derivative = self.array_of_nones
-        self.rig_type = self.array_of_nones
-        self.target = self.array_of_nones
-        self.predictions = self.array_of_nones
-
-    @property
-    def components(self):
-        """tuple of str: Data components names."""
-        return "time", "derivative", "rig_type", "target", "predictions", "images"
-
-    @action
-    def load(self, fmt=None, components=None, *args, **kwargs):
-        """
-        Load given components from file.
-
-        Parameters
-        ----------
-        fmt : str, optional
-            Source format.
-        components : iterable, optional
-
-        Returns
-        -------
-        batch : RadialImagesBatchs
-            Batch with loaded components. Changes batch data inplace.
-
-        Raises
-        ------
-        ValueError
-            If source path is not specified and batch's ``index`` is not a
-            ``FilesIndex``.
-        """
-
-        components = [components] if isinstance(components, str) else components
-
-        if fmt in ['npz', 'csv']:
-            RadialBatch.load(self, fmt=fmt, components=components, *args, **kwargs)
-        elif fmt == 'image':
-            ImagesBatch.load(self, fmt=fmt, components=components, *args, **kwargs)
         return self
