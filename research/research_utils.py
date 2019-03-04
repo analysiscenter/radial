@@ -2,15 +2,16 @@
 import os
 from copy import deepcopy
 from itertools import combinations
+from collections import defaultdict
 
 import json
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tabulate import tabulate
 
 from radial.batchflow import Dataset, FilesIndex # pylint: disable=import-error
-
 from radial.batchflow.research import Research # pylint: disable=import-error
 from radial.batchflow.research.research import Executable # pylint: disable=import-error
 
@@ -50,7 +51,7 @@ def create_datasets(path, batch, cross_val=None):
         dsets.append([dset_train, dset_test])
     return dsets
 
-def update_research(research, pipeline, name, dataset):
+def _update_research(research, pipeline, name, dataset):
     """Load given the data into research.
 
     Parameters
@@ -112,7 +113,7 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     # simple Research run without cross validation
     research = deepcopy(res)
     if not isinstance(dataset, list):
-        research = update_research(research, [train_pipeline, test_pipeline],\
+        research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset.train, dataset.test])
         research.run(n_reps=n_reps, n_iters=n_iters, name=research_name, progress_bar=True)
         return research
@@ -135,7 +136,7 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     print('number of bins: ', cross_val)
     for i in range(cross_val):
         research = deepcopy(res)
-        research = update_research(research, [train_pipeline, test_pipeline],\
+        research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset[i][0], dataset[i][1]])
         research_name_cv = './%s/' % dir_name + research_name + '_cv_%d' % i
         research.run(n_reps=n_reps, n_iters=n_iters, name=research_name_cv, progress_bar=True)
@@ -164,7 +165,7 @@ def split_df_by_name(dataframe, parameters, draw_dict=None):
     all_names = {}
     if draw_dict is not None:
         for key, value in draw_dict.items():
-            dataframe = dataframe[dataframe[key].isin(value)]
+            dataframe = dataframe[dataframe[key].isin(list([value]))]
             if dataframe.empty:
                 raise ValueError("Incorrect column name {} or value {}.".format(key, value))
     for names, name_df in dataframe.groupby('name'):
@@ -250,14 +251,14 @@ def draw_history(research, names, types_var, cross_val=None, aggr=False, iter_st
         graph.map(sns.lineplot, 'iteration', dtype).add_legend()
         plt.show()
 
-def draw_hisogram(research, name, type_var, cross_val=False, draw_dict=None):
+def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
     """Draw historgram of research results by given `name` of function and `type_var`.
 
     Parameters
     ----------
     research : Research
 
-    name : str or list of str
+    names : str or list of str
         Names of functions from Research.
     type_var : str or list of str
         Names where the function result saved.
@@ -268,7 +269,7 @@ def draw_hisogram(research, name, type_var, cross_val=False, draw_dict=None):
         Keys : names of columns.
         Values : The values of visualize params.
     """
-    data = _prepare_results(research, cross_val=cross_val, draw_dict=draw_dict)[name]
+    data = _prepare_results(research, cross_val=cross_val, draw_dict=draw_dict)[names]
     plt.figure(figsize=(10, 7))
     for numb, metric_list in data.groupby('parameters')[type_var]:
         sns.distplot(np.mean(list(metric_list), axis=0), label=str(numb))
@@ -277,3 +278,51 @@ def draw_hisogram(research, name, type_var, cross_val=False, draw_dict=None):
     plt.title('Distribution of absolute error')
     plt.legend()
     plt.show()
+
+def print_results(research, names, types_var, cross_val=None, draw_dict=None, n_last=100, none=False): # pylint: disable=too-many-locals,too-many-arguments
+    """Print table with mean values of 'names' columns from 'n_last' iterations.
+    NOTE : Works uncorrect with cross validation directories.
+
+    Parameters
+    ----------
+    research : Research
+
+    names : str or list of str
+        Names of functions from Research.
+    type_var : str or list of str
+        Names where the function result saved.
+    cross_val : None or int
+        Number of cross validation bins.
+    draw_dict : dict
+        Only current params from dictionary will be drawn.
+        Keys : names of columns.
+        Values : The values of visualize params.
+    n_last : int
+        Number of iterations(from the end) from which mean values will be calculated.
+    none : bool
+        If True, than none values will be ignored,
+        else if any none in column appeared, than mean value of its column will be none.
+    """
+    all_names = _prepare_results(research, None, cross_val, False, 0, draw_dict)
+    grouped = [all_names.get(name) for name in names]
+    printed = defaultdict(lambda: defaultdict(dict))
+    for name, dframe in zip(names, grouped):
+        nan_col = dframe.columns[dframe.isna().any()].tolist()
+        dtype = types_var[0]
+        for dtp in types_var:
+            if dtp not in nan_col:
+                dtype = dtp
+                break
+        for param, dfm in dframe.groupby('parameters'):
+            values = []
+            for i in range(np.max(dfm['repetition']) + 1):
+                rep_val = dfm[dfm['repetition'] == i][dtype].values[-n_last:]
+                if len(rep_val) < n_last:
+                    rep_val = np.concatenate(rep_val)
+                values.append(np.nanmean(rep_val) if none else np.mean(rep_val))
+            printed[param][name] = np.mean(values)
+    val = []
+    col = ['params'] + list(list(printed.items())[0][1].keys())
+    for key, val_dict in printed.items():
+        val.append([key] + list(val_dict.values()))
+    print(tabulate(val, col, tablefmt='fancy_grid'))

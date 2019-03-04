@@ -7,6 +7,8 @@ import numpy as np
 import scipy as sc
 
 from .decorators import init_components
+from sklearn.ensemble import IsolationForest
+
 from . import radial_batch_tools as bt
 from .decorators import init_components
 from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
@@ -97,6 +99,14 @@ class RadialBatch(Batch):
 
         return self
 
+    @inbatch_parallel(init='indices')
+    def _sort(self, index, components):
+        i = self.get_pos(None, 'time', index)
+        time_mask = np.argsort(getattr(self, 'time')[i])
+        for component in components:
+            data = getattr(self, component)[i]
+            getattr(self, component)[i] = data[time_mask]
+
     @inbatch_parallel(init="indices", post="_assemble_load", target="threads")
     def _load(self, indice, fmt=None, components=None, *args, **kwargs):
         """ Load given components from file.
@@ -181,7 +191,6 @@ class RadialBatch(Batch):
     @inbatch_parallel(init="indices", target="threads")
     def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
         """Drop outliers using Isolation Forest algorithm.
-
         Parameters
         ----------
         contam : float (from 0 to 0.5)
@@ -348,13 +357,6 @@ class RadialBatch(Batch):
         return self
 
     @action
-    def prepare_answer(self, src='target', **kwargs):
-        """ Reshaped component co vector with shape = (-1, 1)."""
-        _ = kwargs
-        setattr(self, src, getattr(self, src).reshape(-1, 1))
-        return self
-
-    @action
     @init_components
     @inbatch_parallel(init='indices')
     def normalize(self, ix, src=None, dst=None, src_range=None, dst_range=None, **kwargs):
@@ -464,6 +466,46 @@ class RadialBatch(Batch):
                 getattr(self, dst[i])[pos] = new_data
             else:
                 raise ValueError('Src_range must be provided to denormalize component')
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init='indices')
+    def to_log10(self, ix, src=None, dst=None, **kwargs):
+        """Takes a decimal logarithm from `src` and saves the resulting value to `dst`
+
+        Parameters
+        ----------
+        src : src or list
+            Name of the component with data
+        dst : src or list
+            Name of the component to save the result
+        """
+        _ = kwargs
+        if isinstance(src, str):
+            src = [src]
+            dst = [dst]
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            comp_data = getattr(self, component)[pos]
+            getattr(self, dst[i])[pos] = np.log10(comp_data)
+        return self
+
+    @action
+    @init_components
+    @inbatch_parallel(init='indices')
+    def clip_values(self, ix, src, dst, **kwargs):
+        """Clip values from `src` to 0, 1 and save it to `dst`
+        """
+        _ = kwargs
+        if isinstance(src, str):
+            src = [src]
+            dst = [dst]
+
+        for i, component in enumerate(src):
+            pos = self.get_pos(None, component, ix)
+            pred = getattr(self, component)[pos]
+            getattr(self, dst[i])[pos] = np.clip(pred, 0, 1)
         return self
 
     @action

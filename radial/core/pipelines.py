@@ -16,11 +16,8 @@ def create_preprocess_pipeline(n_samples, sampler=None):
                            src_range=[None, None, 'derivative_q'],
                            dst_range=[None, 'derivative_q', None])
                 .get_samples(n_samples, n_samples=1, sampler=sampler, src=['time', 'derivative'])
-                .denormalize_component(src=['target', 'target'],
-                                       dst=['denorm_predictions', 'denorm_target'],
-                                       src_range=['derivative_q', 'derivative_q'])
                 .make_points(src=['time', 'derivative'], dst=['points'])
-                .prepare_answer(src='target')
+                .make_target(src='target')
                )
     return pipeline
 
