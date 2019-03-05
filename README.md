@@ -1,15 +1,13 @@
 # Radial
 
-`Radial` is a framework for constructing neural network solutions to the problem of finding the exit point of the well to the radial mode.
+`Radial` is a framework for constructing solutions to predict the entry into the radial mode.
 
-Main features:
-
-* load data from XLSX and save it to NPZ format.
+It allows to:
+* predict a value of the entry into the radial mode based on the pressure derivative vs time data.
 * drop outliers using Isolation Forest.
-* normalize, drop negatives, make a point approximation by 1d interpolation and logarithm of the time and derivative of the pressure.
-* making a cross validation approach to finding an optimal parameters of the neural network.
-* Train with models from zoo of state-of-the-art neural networks.
-* Predict on logarithmic data of NPZ format.
+* preprocess data, i.e. normalize, drop negatives, sample an equal grid to feed models, etc.
+* load data from XLSX and save it to NPZ format.
+* make a cross-validation approach to find optimal parameters for the neural network.
 
 ## About Radial
 
@@ -17,15 +15,15 @@ Main features:
 
 Radial has three modules [``core``](https://github.com/analysiscenter/radial/tree/master/radial/core), [``preprocessing``](https://github.com/analysiscenter/radial/tree/master/radial/preprocessing) and [``pipelines``](https://github.com/analysiscenter/radial/tree/master/radial/pipelines).
 
-``core`` module contains ``RadialBatch`` class. This class include actions for loading data, normalize, approximation and doing other point preprocessing. These actions allows to create workflow that could be used to training machine learning models or neural networks.
+``core`` module contains ``RadialBatch`` class. This class includes methods that allows to load, normalize, interpolate and transform input data to feed the model.
 
 ``preprocessing`` module is designed to work with raw data. This module has two files for preprocessing:
-* ``xls_to_npz.py`` - comprise a function to convert raw data from XLS format to NPZ format
-* ``make_isolation.py`` - filtering outliers using Isolation Forest algorithm.
+* ``xls_to_npz.py`` - contains a function to convert raw data from XLS format to NPZ format
+* ``make_isolation.py`` - filters outliers using Isolation Forest algorithm.
 
 ``pipelines`` module provides predefined workflows to:
-* preprocess time and derivative of the pressure.
-* train a model and perform an inference to finding the exit point of the well to the radial mode.
+* preprocess pressure derivative and time data.
+* train a model and perform an inference to find the entry into the radial mode.
 
 ## Basic usage
 
@@ -33,7 +31,7 @@ Radial has three modules [``core``](https://github.com/analysiscenter/radial/tre
 
 #### Preprocessing xls files
 
-To prepare data that stored in XLSX just run following commands:
+To prepare data that is stored in XLSX run following command:
 ```bash
 foo@bar:~$ python xls_to_npz.py -l path/to/whole_data.xlsx -s path/to/save
 Done!
@@ -54,8 +52,8 @@ Done!
 
 #### Removing outliers
 
-The next step is optional. If you have a large dataset than dropping outliers during the training could slow down the whole process. To avoid this problem use `drop_outliers.py`. In the same time, this function is available in the ``RadialBatch``.
-Anyway, following command allows you to run this function with NPZ-data:
+The next step is optional. If you have a large dataset then dropping outliers during model training may slow down the whole process. To avoid this problem perform denoising in advance using `drop_outliers.py`. Otherwise, this function is available in the ``RadialBatch`` and can be added to the common workflow.
+Following command runs this function with NPZ-data:
 ```bash
 foo@bar:~$ python drop_outliers.py -l path/to/npz_data -s path/to/save
 Done!
@@ -76,7 +74,7 @@ Done!
 
 ### Train model
 
-Here is an example of pipeline that load data, makes preprocessing and trains a model for 100 epochs:
+Here is an example of a pipeline that loads data, makes preprocessing and trains a model for 100 epochs:
 ```python
 train_pipeline = (
     Pipeline()
@@ -120,7 +118,7 @@ import radial
 
 ### Installation as a project repository
 
-When cloning repo from GitHub use flag ``--recursive`` to make sure that ``batchflow`` submodule is also cloned.
+When cloning the repo from GitHub use flag ``--recursive`` to make sure that ``batchflow`` submodule is also cloned.
 
     git clone --recursive https://github.com/analysiscenter/radial.git
 
