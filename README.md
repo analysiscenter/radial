@@ -72,29 +72,61 @@ foo@bar:~$ python drop_outliers.py -l path/to/npz_TEST_data path/to/npz_TRAIN_da
 Done!
 ```
 
+### Predict
+
+Say you have data stored in numpy arrays `time` and `derivative` of shape (n_items, ) with dtype object (because arrays for every item have different length).
+Then to get a predictions run
+
+```python
+    test_pipeline = (Pipeline()
+                        .load(src=(time, derivative), components=['time', 'derivative'])
+                        .drop_negative(src=['time', 'derivative'])
+                        .drop_outliers(src=['time', 'derivative'])
+                        .to_log10(src=['time', 'derivative'], dst=['time', 'derivative'])
+                        .normalize(src=['time', 'derivative'],
+                                   dst_range=[None, 'derivative_q'])
+                        .get_samples(100, n_samples=1, sampler=np.random.random, src=['time', 'derivative'])
+                        .make_points(src=['time', 'derivative'], dst=['points'])
+                        .init_variable('predictions', init_on_each_run=list)
+                        .init_model('dynamic', TFModel, 'model',
+                                     config={'load' : {'path' : 'path_to_saved_model'},
+                                             'build': False})
+                        .init_variable('ind', init_on_each_run=list)
+                        .update_variable('ind', B('indices'), mode='e')
+                        .predict_model('model', fetches='predictions',
+                                                feed_dict={'points': B('points')},
+                                        save_to=B('predictions'), mode='w')
+                        .clip_values(src=['predictions'])
+                        .denormalize_component(src=['predictions'],
+                                               src_range=['derivative_q'])
+                        .update_variable('predictions', B('predictions'), mode='e')
+                    )
+    predicted_batch = (test_pipeline << dataset).next_batch(1)
+    predictions = predicted_batch.predictions
+```
+
 ### Train model
 
 Here is an example of a pipeline that loads data, makes preprocessing and trains a model for 100 epochs:
 ```python
-train_pipeline = (
-    Pipeline()
-    .load(fmt='npz')
-    .drop_negative(src=['time', 'derivative'])
-    .drop_outliers(src=['time', 'derivative'])
-    .to_log10(src=['time', 'derivative', 'target'],
-              dst=['time', 'derivative', 'target'])
-    .normalize(src=['time', 'derivative', 'target'],
-               dst=['time', 'derivative', 'target'],
-               src_range=[None, None, 'derivative_q'],
-               dst_range=[None, 'derivative_q', None])
-    .get_samples(n_samples, n_samples=1, sampler=sampler, src=['time', 'derivative'])
-    .make_points(src=['time', 'derivative'], dst=['points'])
-    .make_target(src='target')
-    .init_variable('loss', init_on_each_run=list)
-    .init_model('dynamic', RadialModel, model_name, config=model_config)
-    .train_model('model', fetches='loss', feed_dict=feed_dict,
-                 save_to=V('loss'), mode='w')
-) << data
+train_pipeline = (Pipeline()
+                     .load(fmt='npz')
+                     .drop_negative(src=['time', 'derivative'])
+                     .drop_outliers(src=['time', 'derivative'])
+                     .to_log10(src=['time', 'derivative', 'target'],
+                               dst=['time', 'derivative', 'target'])
+                     .normalize(src=['time', 'derivative', 'target'],
+                                dst=['time', 'derivative', 'target'],
+                                src_range=[None, None, 'derivative_q'],
+                                dst_range=[None, 'derivative_q', None])
+                     .get_samples(n_samples, n_samples=1, sampler=sampler, src=['time', 'derivative'])
+                     .make_points(src=['time', 'derivative'], dst=['points'])
+                     .make_target(src='target')
+                     .init_variable('loss', init_on_each_run=list)
+                     .init_model('dynamic', RadialModel, model_name, config=model_config)
+                     .train_model('model', fetches='loss', feed_dict=feed_dict,
+                                  save_to=V('loss'), mode='w')
+                  ) << data
 
 train_pipeline.run(50, n_epochs=100, drop_last=True, shuffle=True, bar=True)
 ```
