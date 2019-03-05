@@ -164,7 +164,7 @@ Please cite Radial in your publications if it helps your research.
     of finding exit point to the radial mode. 2019.
 
 ```
-@misc{cardio_2017_1156085,
+@misc{radial_2019_1156085,
   author       = {Khudorozhkov R., Broilovskiy A., Mylzenova D., Podvyaznikov D.},
   title        = {Radial library for deep research of finding exit point to the radial mode},
   year         = 2019
