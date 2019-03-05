@@ -1,3 +1,0 @@
-[submodule "radial/dataset"]
-	path = radial/dataset
-	url = https://github.com/analysiscenter/dataset.git
