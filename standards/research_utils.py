@@ -175,7 +175,7 @@ def split_df_by_name(dataframe, parameters, draw_dict=None):
     for names, name_df in dataframe.groupby('name'):
         new_df = pd.DataFrame()
         for param_names, values in name_df.groupby(parameters):
-            values['parameters'] = str(param_names)[1:-1]
+            values['parameters'] = str(param_names).replace("'", "")
             new_df = new_df.append(values)
         all_names[names] = new_df
     return all_names
