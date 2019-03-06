@@ -2,7 +2,7 @@
 import numpy as np
 
 from ..batchflow import Pipeline, B, V
-from ..batchflow.models.tf import TFModel
+from ..batchflow.models.tf import TFModel # pylint: disable=no-name-in-module, import-error
 
 
 def create_preprocess_pipeline(n_samples, sampler=None):
@@ -48,7 +48,7 @@ def create_predict_pipeline(prep=None, load_model=None, **kwargs):
 
     if load_model is None:
         raise ValueError("`load_model` should be or src or Pipeline not None")
-    elif isinstance(load_model, str):
+    if isinstance(load_model, str):
         model_pipeline = Pipeline().init_model('dynamic', TFModel, 'model',
                                                config={'load' : {'path' : load_model},
                                                        'build': False})
