@@ -111,7 +111,6 @@ Or if you want to use a console. Run following command inside prod directory.
 
 ```bash
 foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
-Done!
 ```
 
 ### Train model
@@ -139,6 +138,8 @@ train_pipeline = (Pipeline()
 
 train_pipeline.run(50, n_epochs=100, drop_last=True, shuffle=True, bar=True)
 ```
+
+Process from preprocessing to prediction is described in this [notebook](./research/whole_process.ipynb).
 
 ## Installation
 
