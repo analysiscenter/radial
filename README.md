@@ -105,6 +105,15 @@ Then to get a predictions run
     predictions = predicted_batch.predictions
 ```
 
+Or if you want to use a console. Run following command inside prod directory.
+
+> NOTE: This option works only with data that should be a NPY file with 2d numpy array with shape = (2, N).
+
+```bash
+foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
+Done!
+```
+
 ### Train model
 
 Here is an example of a pipeline that loads data, makes preprocessing and trains a model for 100 epochs:
