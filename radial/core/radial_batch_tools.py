@@ -1,5 +1,6 @@
 """ Tools for RadialBatch """
 import os
+from collections import defaultdict
 
 import numpy as np
 import seaborn as sns
@@ -23,7 +24,6 @@ def get_mape30(iteration, experiment, pipeline):
     ape = np.abs(y_true-y_pred)/y_true
     return np.mean(ape < 0.3)*100
 
-# сохраним обученные модели
 def save_model(iteration, experiment, pipeline, model_name, path='./'):
     """ Save model to a path."""
     path = os.path.join(path, experiment[pipeline].config.alias(as_string=True) + '_' + str(iteration))
@@ -99,7 +99,68 @@ def load_npz(path=None, components=None, *args, **kwargs):
 
     return [data[comp] for comp in components]
 
-
 def log(*args):
     """ Compute logarithm for apply transoform method """
     return np.array(list(map(np.log10, args)))
+
+
+def draw_predictions(results, names, path=None):
+    """Draw a predictions on real data.
+
+    Parameters
+    ----------
+    results : defaultdict
+        Results of testing process.
+    names : list
+        File names.
+    path : str
+        Path to data.
+    """
+    _, ax = plt.subplots(5, 4, figsize=(20, 16))
+    ax = ax.reshape(-1)
+    for i, name in enumerate(names):
+        val = dict(np.load(os.path.join(path, name)))
+        ape = np.abs(results[name]['pred']-np.log10(val['target']))/np.log10(val['target'])
+
+        ax[i].scatter(np.log10(val['time']), np.log10(val['derivative']))
+        ax[i].axhline(np.log10(val['target']), ls='--', c='g', lw=1, alpha=0.6, label='target')
+        ax[i].axhline(np.mean(results[name]['pred']), ls='--', c='b', lw=1, alpha=0.6, label='pred')
+        ax[i].set_title('ape: {:.3} name: {}'.format(ape * 100, name))
+        ax[i].legend()
+        plt.subplots_adjust(wspace=0.1, hspace=0.3)
+    plt.show()
+
+def calculate_results(pipeline):
+    """Prepare predictions given from `pipeline` that ran many epochs.
+
+    Parameters
+    ----------
+    pipeline : Pipeline
+
+    Returns
+    -------
+    results : defaultdict
+        dict with predictions and targets for each target
+    names : numpy array
+        numpy array with names of files that sorted by error value
+    """
+    results = defaultdict(lambda: defaultdict(list))
+    for i in range(len(pipeline.get_variable('ind'))):
+        results[pipeline.get_variable('ind')[i]]['pred'].append(np.ravel(pipeline.get_variable('predictions')[i])[0])
+        results[pipeline.get_variable('ind')[i]]['true'] = pipeline.get_variable('targets')[i]
+    true = []
+    pred = []
+    for key in results.keys():
+        results[key]['pred'] = np.mean(results[key]['pred'])
+        true.append(results[key]['true'][0])
+        pred.append(results[key]['pred'])
+
+    names = []
+    diff = []
+    for key, item in results.items():
+        diff.append(np.abs(np.mean(item['pred']) - item['true'][0])/item['true'][0])
+        names.append(key)
+
+    sorted_ix = np.argsort(diff)
+    names = np.array(names)[sorted_ix]
+    return results, names

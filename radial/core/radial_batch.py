@@ -35,7 +35,7 @@ class RadialBatch(Batch):
         self.target = self.array_of_nones
         self.predictions = self.array_of_nones
 
-    components = "time", "derivative", "rig_type", "target", "predictions"
+    components = "time", "derivative", "rig_type", "target"
 
     @property
     def array_of_nones(self):
