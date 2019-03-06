@@ -1,4 +1,11 @@
-"""File with function that takes log10 time and log10 of the derivative of the pressure and reutrns log10 point of exit to radial mode. """
+"""File with function that takes log10 time and log10 of the derivative of the pressure and reutrns log10 point of exit to radial mode.
+
+BASIC USAGE:
+foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
+
+or run python predict.py --help
+
+"""
 import os
 import sys
 
@@ -21,11 +28,26 @@ def load():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--path', type=str, help="Path to file with time and derivative of the pressure.",
                         required=True)
+    parser.add_argument('-m', '--model', type=str, help="Path to saved model. Default = ./save_model", default='./saved_model')
     args = parser.parse_args()
     data = np.load(args.path)
-    return predict(data[0], data[1])
+    model_path = args.model
+    return predict(data[0], data[1], model_path)
 
-def predict(time, derivative):
+def predict(time, derivative, model_path):
+    """Make a prediction using loaded model
+
+    Parameters
+    ----------
+    time : numpy array
+        log 10 time values
+    derivative : numpy array
+        log 10 derivative values
+
+    Returns
+    -------
+        : radial mode point
+    """
     time = np.array([time] + [None])[:-1]
     derivative = np.array([derivative] + [None])[:-1]
 
@@ -43,7 +65,7 @@ def predict(time, derivative):
     test_pipeline = prep_pipeline + (Pipeline()
                         .init_variable('predictions', init_on_each_run=list)
                         .init_model('dynamic', TFModel, 'model',
-                                     config={'load' : {'path' : './../research/saved_8/num_blocks_8/'},
+                                     config={'load' : {'path' : model_path},
                                              'build': False})
                         .init_variable('ind', init_on_each_run=list)
                         .update_variable('ind', B('indices'), mode='e')
@@ -51,8 +73,8 @@ def predict(time, derivative):
                                                 feed_dict={'points': B('points')},
                                         save_to=B('predictions'), mode='w')
                         .clip_values(src=['predictions'])
-                        .denormalize_component(src=['predictions'],
-                                               src_range=['derivative_q'])
+                        .denormalize(src=['predictions'],
+                                     src_range=['derivative_q'])
                         .update_variable('predictions', B('predictions'), mode='e')
     ) << ds
     test_pipeline.run(1, n_epochs=10)
