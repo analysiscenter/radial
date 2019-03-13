@@ -14,11 +14,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join('..'))
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
-from radial.core import RadialBatch
-from radial.batchflow.models.tf import TFModel
-from radial.batchflow import Dataset, Pipeline, B
+from .radial.core import RadialBatch
+from .radial.batchflow.models.tf import TFModel
+from .radial.batchflow import Dataset, Pipeline, B
 
 def load():
     """load data from path, given with argument `-p`.

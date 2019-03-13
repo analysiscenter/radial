@@ -9,7 +9,7 @@ with open('radial/__init__.py', 'r') as f:
 
 setup(
     name='radial',
-    packages=find_packages(exclude=['examples', 'research']),
+    packages=find_packages(exclude=['research']),
     version=VERSION,
     url='https://github.com/analysiscenter/radial',
     author='Data Analysis Center team',
@@ -30,7 +30,8 @@ setup(
         'tabulate>=0.8.2',
         'argparse>=1.1',
         'pytest>=4.0.0',
-        'psutil>=5.5.1'
+        'psutil>=5.5.1',
+        'dill>=0.2.8.2',
     ],
     extras_require={
         'tensorflow': ['tensorflow>=1.12'],
