@@ -31,7 +31,7 @@ def save_model(iteration, experiment, pipeline, model_name, path='./'):
     pipeline.save_model(model_name, path)
 
 def get_ape(iteration, experiment, pipeline):
-    """ Calculate percentage of absolute percentage error."""
+    """ Calculate absolute percentage error."""
     _ = iteration
     pipeline = experiment[pipeline].pipeline
     y_pred = np.array(pipeline.get_variable('predictions')).reshape(-1)
