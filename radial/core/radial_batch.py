@@ -466,7 +466,7 @@ class RadialBatch(Batch):
     @init_components
     @inbatch_parallel(init='indices')
     def to_log10(self, ix, src=None, dst=None, **kwargs):
-        """Takes a decimal logarithm from `src` and saves the resulting value to `dst`
+        """Takes a decimal logarithm of `src` and saves the resulting value to `dst`
 
         Parameters
         ----------
