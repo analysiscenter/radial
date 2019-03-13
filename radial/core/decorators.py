@@ -12,7 +12,7 @@ def _safe_make_array(dst, len_src):
     dst : str or None or list, tuple, np.ndarray of str
         Contains names of batch component(s) to be processed
     len_src : int
-        Desired length of resulting array
+        Desired length of array of source components
     Returns
     -------
     np.array
@@ -24,7 +24,7 @@ def _safe_make_array(dst, len_src):
             dst = np.asarray(dst).reshape(-1)
     elif not len(dst) == len_src:
         raise ValueError('Number of given components must be equal')
-    return dst
+    return np.array(dst)
 
 def init_components(method):
     """ Decorator used for preprocessing kwargs such as src, dst, src_range, dst_range.

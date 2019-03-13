@@ -248,9 +248,9 @@ class RadialBatch(Batch):
 
         Note
         ----
-        Sampler should have following parameters: `tmin`, `tmax`, `size`. Other
-        parameters to this function should be passed via kwargs.
-        See ``beta_sampler`` method for example.
+        If sampler is name expression and it has a following parameters:
+        `tmin`, `tmax`, 'size' and others. Than this params should be passed via kwargs.
+        See ``beta_sampler`` method for exampleн.
         """
         _ = kwargs
         if seed:
@@ -455,7 +455,6 @@ class RadialBatch(Batch):
             comp_data = getattr(self, component)[pos]
             if src_range[i]:
                 min_value, scale_value = getattr(self, src_range[i])[pos]
-                new_data = (comp_data - min_value) / scale_value
                 new_data = comp_data * scale_value + min_value
                 getattr(self, dst[i])[pos] = new_data
             else:
@@ -466,7 +465,7 @@ class RadialBatch(Batch):
     @init_components
     @inbatch_parallel(init='indices')
     def to_log10(self, ix, src=None, dst=None, **kwargs):
-        """Takes a decimal logarithm of `src` and saves the resulting value to `dst`
+        """Takes a decimal logarithm from `src` and saves the resulting value to `dst`
 
         Parameters
         ----------
@@ -580,6 +579,5 @@ class RadialBatch(Batch):
         new_loss_history_dict = dict(zip(self.index.indices, self.pipeline.get_variable(src)))
         if isinstance(self.pipeline.get_variable(dst), dict):
             new_loss_history_dict = {**new_loss_history_dict, **self.pipeline.get_variable(dst)}
-        self.pipeline.update_variable(dst, new_loss_history_dict,
-                                      mode='w')
+        self.pipeline.update_variable(dst, new_loss_history_dict, mode='w')
         return self
