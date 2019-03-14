@@ -72,6 +72,32 @@ foo@bar:~$ python drop_outliers.py -l path/to/npz_TEST_data path/to/npz_TRAIN_da
 Done!
 ```
 
+### Train model
+
+Here is an example of a pipeline that loads data, makes preprocessing and trains a model for 100 epochs:
+```python
+train_pipeline = (Pipeline()
+                     .load(fmt='npz')
+                     .drop_negative(src=['time', 'derivative'])
+                     .drop_outliers(src=['time', 'derivative'])
+                     .to_log10(src=['time', 'derivative', 'target'],
+                               dst=['time', 'derivative', 'target'])
+                     .normalize(src=['time', 'derivative', 'target'],
+                                dst=['time', 'derivative', 'target'],
+                                src_range=[None, None, 'derivative_q'],
+                                dst_range=[None, 'derivative_q', None])
+                     .get_samples(n_samples, n_samples=1, sampler=sampler, src=['time', 'derivative'])
+                     .make_points(src=['time', 'derivative'], dst=['points'])
+                     .make_target(src='target')
+                     .init_variable('loss', init_on_each_run=list)
+                     .init_model('dynamic', RadialModel, model_name, config=model_config)
+                     .train_model('model', fetches='loss', feed_dict=feed_dict,
+                                  save_to=V('loss'), mode='w')
+                  ) << data
+
+train_pipeline.run(50, n_epochs=100, drop_last=True, shuffle=True, bar=True)
+```
+
 ### Predict
 
 Say you have data stored in numpy arrays `time` and `derivative` of shape (n_items, ) with dtype object (because arrays for every item have different length).
@@ -113,33 +139,17 @@ Or if you want to use a console. Run following command inside prod directory.
 foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
 ```
 
-### Train model
-
-Here is an example of a pipeline that loads data, makes preprocessing and trains a model for 100 epochs:
-```python
-train_pipeline = (Pipeline()
-                     .load(fmt='npz')
-                     .drop_negative(src=['time', 'derivative'])
-                     .drop_outliers(src=['time', 'derivative'])
-                     .to_log10(src=['time', 'derivative', 'target'],
-                               dst=['time', 'derivative', 'target'])
-                     .normalize(src=['time', 'derivative', 'target'],
-                                dst=['time', 'derivative', 'target'],
-                                src_range=[None, None, 'derivative_q'],
-                                dst_range=[None, 'derivative_q', None])
-                     .get_samples(n_samples, n_samples=1, sampler=sampler, src=['time', 'derivative'])
-                     .make_points(src=['time', 'derivative'], dst=['points'])
-                     .make_target(src='target')
-                     .init_variable('loss', init_on_each_run=list)
-                     .init_model('dynamic', RadialModel, model_name, config=model_config)
-                     .train_model('model', fetches='loss', feed_dict=feed_dict,
-                                  save_to=V('loss'), mode='w')
-                  ) << data
-
-train_pipeline.run(50, n_epochs=100, drop_last=True, shuffle=True, bar=True)
-```
-
 Process from preprocessing to prediction is described in this [notebook](./research/whole_process.ipynb).
+
+## Model evaluation
+
+The detailed description of parameters and models estimation is written in this [notebook](./standards/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 10 times.
+
+MAPE < 30 % | STD
+------------ | -------------
+91.932 | 0.564
+
+![Distribution_PE](https://yadi.sk/i/mwG7CyNOMyMxmA)
 
 ## Installation
 
