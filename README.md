@@ -155,21 +155,6 @@ And the histogram of distribution of percentage error:
 
 ## Installation
 
-### Installation as a python package
-
-With [pipenv](https://docs.pipenv.org/):
-
-    pipenv install git+https://github.com/analysiscenter/radial.git#egg=radial
-
-With [pip](https://pip.pypa.io/en/stable/):
-
-    pip3 install git+https://github.com/analysiscenter/radial.git
-
-After that just import `radial`:
-```python
-import radial
-```
-
 ### Installation as a project repository
 
 When cloning the repo from GitHub use flag ``--recursive`` to make sure that ``batchflow`` submodule is also cloned.
