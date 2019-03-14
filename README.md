@@ -149,7 +149,9 @@ MAPE < 30 % | STD
 ------------ | -------------
 91.932 | 0.564
 
-![Distribution_PE](https://yadi.sk/i/mwG7CyNOMyMxmA)
+And the histogram of distribution of percentage error.
+
+![Distribution_PE](./images/distribution_of_ae.png)
 
 ## Installation
 
