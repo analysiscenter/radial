@@ -149,9 +149,9 @@ MAPE < 30 % | STD
 ------------ | -------------
 91.932 | 0.564
 
-And the histogram of distribution of percentage error.
+And the histogram of distribution of percentage error:
 
-![Distribution_PE](./images/distribution_of_ae.png)
+<img src="./images/distribution_of_ae.png" alt="drawing" width="520"/>
 
 ## Installation
 
