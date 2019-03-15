@@ -4,14 +4,14 @@ from functools import wraps
 import numpy as np
 
 
-def _safe_make_array(dst, len_src):
+def _safe_make_array(dst, length):
     """ Makes array from dst data. Raises exception if length of resulting array
-    is not equal to len_src. If dst is None returns array of None of length len_src.
+    is not equal to length. If dst is None returns array of None of length length.
     Parameters
     ----------
     dst : str or None or list, tuple, np.ndarray of str
         Contains names of batch component(s) to be processed
-    len_src : int
+    length : int
         Desired length of array of source components
     Returns
     -------
@@ -19,10 +19,10 @@ def _safe_make_array(dst, len_src):
     """
     if not isinstance(dst, (list, tuple, np.ndarray)):
         if not dst:
-            dst = np.array([None] * len_src)
+            dst = np.array([None] * length)
         else:
             dst = np.asarray(dst).reshape(-1)
-    elif not len(dst) == len_src:
+    elif not len(dst) == length:
         raise ValueError('Number of given components must be equal')
     return np.array(dst)
 

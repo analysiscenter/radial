@@ -504,7 +504,7 @@ class RadialBatch(Batch):
     @action
     @init_components
     def make_array(self, src=None, dst=None, **kwargs):
-        """ TODO: Should be rewritten as post function
+        """ Stacks a sequence of arrays in a given component.
         """
         _ = kwargs
         for i, component in enumerate(src):
@@ -514,7 +514,9 @@ class RadialBatch(Batch):
     @action
     @init_components
     def expand_dims(self, src=None, dst=None, **kwargs):
-        """ Expands the shape of an array stored in a given component.
+        """ Expands the shape of an array stored in a given component
+        Inserts a new axis that will appear as the last axis.
+        Acts like np.expand_dims with parameter axis=-1.
         Parameters
         ----------
         src : list of str
@@ -548,12 +550,11 @@ class RadialBatch(Batch):
         btch_size = len(self.indices)
         if statistics_name and isinstance(self.pipeline.get_variable(statistics_name), dict):
             loss_history_dict = self.pipeline.get_variable(statistics_name)
-
             sorted_by_value = sorted(loss_history_dict.items(), key=lambda kv: kv[1])
             hard_count = int(btch_size * fraction)
-            hard_indices = {x[0] for x in sorted_by_value[:hard_count]} - set(self.indices)
-            new_index = list(self.indices[: btch_size - len(hard_indices)]) + list(hard_indices)
-
+            hard_indices = np.setdiff1d(np.array([x[0] for x in sorted_by_value]), self.indices)[:hard_count]
+            new_index = np.hstack([np.random.choice(self.indices, size=btch_size - hard_count, replace=False), \
+                                   hard_indices])
             random.shuffle(new_index)
             batch = RadialBatch(index=self.pipeline.dataset.index.create_subset(new_index))
             return batch
