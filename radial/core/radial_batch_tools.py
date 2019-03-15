@@ -183,10 +183,9 @@ def draw_results(btch, metrics, start=1):
     for i in range(start, start+12):
         ax[i-start].scatter(btch.log_time[ix][-i], btch.log_derivative[ix][-i], c='r')
         ax[i-start].hlines(btch.log_target[ix][-i],
-                       np.min(btch.log_time[ix][-i]),
-                       np.max(btch.log_time[ix][-i]), colors='g',
-                       linestyle='-')
-        ax[i-start].hlines(btch.denorm_predictions[ix][-i], np.min(btch.log_time[ix][-i]), 
-                   np.max(btch.log_time[ix][-i]), colors='b', linestyle='-')
-        
+                           np.min(btch.log_time[ix][-i]),
+                           np.max(btch.log_time[ix][-i]), colors='g',
+                           linestyle='-')
+        ax[i-start].hlines(btch.denorm_predictions[ix][-i], np.min(btch.log_time[ix][-i]),
+                           np.max(btch.log_time[ix][-i]), colors='b', linestyle='-')
         ax[i-start].set_title('ape={0:.2f}, idx={1}'.format(metrics[ix][-i], btch.indices[ix][-i]))
