@@ -7,8 +7,6 @@ import numpy as np
 
 sys.path.insert(0, os.path.join('..'))
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
 from radial.core import RadialBatch
 from radial.batchflow.models.tf import TFModel
 from radial.batchflow import Dataset, Pipeline, B, C
@@ -16,7 +14,7 @@ from radial.core.radial_batch_tools import *
 
 GRID_SIZE = 200
 
-def load():
+def make_prediction():
     """load data from path, given with argument `-p`.
     This data should be a NPY file with 2d numpy array with shape = (2, N),
     where N is lenght of time and derivative of the pressure changes.
@@ -56,10 +54,10 @@ def predict(time, derivative):
                         .clip_values(src='predictions', dst='predictions')
                         .denormalize(src='predictions', dst='denorm_predictions',
                                      src_range='derivative_range')
-                        .update_variable('predictions', B('denorm_predictions'), mode='e') 
+                        .update_variable('predictions', B('denorm_predictions'), mode='e')
     ) << ds
     test_pipeline.run(1, n_epochs=1)
     return test_pipeline.get_variable('predictions')
 
 if __name__ == "__main__":
-    sys.exit(load())
+    sys.exit(make_prediction())
