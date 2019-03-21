@@ -160,7 +160,8 @@ class RadialBatch(Batch):
     @init_components
     @inbatch_parallel(init="indices", target="threads")
     def drop_negative(self, index, src=None, dst=None, **kwargs):
-        """ Leaves only positive values.
+        """ Leaves only positive values of derivative. src should be a list with
+        two components name. First component must contain time values, second - derivative.
 
         Raises
         ------
@@ -184,7 +185,8 @@ class RadialBatch(Batch):
     @init_components
     @inbatch_parallel(init="indices", target="threads")
     def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
-        """Drop outliers using Isolation Forest algorithm.
+        """Drop outliers using Isolation Forest algorithm. src should be a list with
+        two components name. First component must contain time values, second - derivative.
         Parameters
         ----------
         contam : float (from 0 to 0.5)
