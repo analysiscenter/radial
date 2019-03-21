@@ -35,8 +35,15 @@ def create_datasets(path, batch, cross_val=None):
     Returns
     -------
         : Dataset or list of Datasets
+
+    Raises
+    ------
+    ValueError
+        if ```path``` is empty or doesn't exist.
     """
     index = FilesIndex(path=path)
+    if len(index.indices) == 0:
+        raise ValueError('Wrong path to data')
     if cross_val is None or cross_val == 1:
         dset = Dataset(index, batch)
         dset.split()
@@ -197,7 +204,7 @@ def _get_parameters(research):
             param_set.update(params)
     return list(param_set)
 
-def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start=0, draw_dict=None):# pylint: disable=too-many-arguments
+def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start=0, draw_dict=None, names=None):# pylint: disable=too-many-arguments
     if cross_val or cross_val in [0, 1]:
         results = []
         if isinstance(research, str):
@@ -213,7 +220,12 @@ def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start
         results = _load_research(research)
         parameters = _get_parameters(research)
     all_names = split_df_by_name(results, parameters, draw_dict)
-    return all_names
+    correct_names = list(all_names.keys())
+    if len(set(correct_names) & set(names)) == 0:
+        raise ValueError('One or more names in {} are incorrect,'\
+                          ' use the names in the following list {}.'.format(names, correct_names))
+    grouped = [all_names.get(name) for name in names]
+    return grouped
 
 def draw_history(research, names, types_var, cross_val=None, aggr=False,
                  iter_start=0, draw_dict=None): # pylint: disable=too-many-locals,too-many-arguments
@@ -242,8 +254,8 @@ def draw_history(research, names, types_var, cross_val=None, aggr=False,
         Values : The values of visualize params.
     """
     hue = 'number_of_cv' if cross_val is not None and cross_val > 1 else None
-    all_names = _prepare_results(research, hue, cross_val, aggr, iter_start, draw_dict)
-    grouped = [all_names.get(name) for name in names]
+    grouped = _prepare_results(research, hue, cross_val, aggr, iter_start, draw_dict, names)
+
     for name, dframe in zip(names, grouped):
         nan_col = dframe.columns[dframe.isna().any()].tolist()
         dtype = types_var[0]
@@ -275,7 +287,7 @@ def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
         Keys : names of columns.
         Values : The values of visualize params.
     """
-    data = _prepare_results(research, cross_val=cross_val, draw_dict=draw_dict)[names]
+    data = _prepare_results(research, cross_val=cross_val, draw_dict=draw_dict, names=[names])[0]
     plt.figure(figsize=(10, 7))
     for numb, metric_list in data.groupby('parameters')[type_var]:
         sns.distplot(np.mean(list(metric_list), axis=0), label=str(numb))
@@ -288,7 +300,7 @@ def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
 def print_results(research, names, types_var, cross_val=None, draw_dict=None,
                   n_last=100, none=False): # pylint: disable=too-many-locals,too-many-arguments
     """Print table with mean values of 'names' columns from 'n_last' iterations.
-    NOTE : Works uncorrect with cross validation directories.
+    NOTE : Works incorrect with cross validation directories.
 
     Parameters
     ----------
@@ -310,8 +322,7 @@ def print_results(research, names, types_var, cross_val=None, draw_dict=None,
         If True, than none values will be ignored,
         else if any none in column appeared, than mean value of its column will be none.
     """
-    all_names = _prepare_results(research, None, cross_val, False, 0, draw_dict)
-    grouped = [all_names.get(name) for name in names]
+    grouped = _prepare_results(research, None, cross_val, False, 0, draw_dict, names)
     printed = defaultdict(lambda: defaultdict(dict))
     for name, dframe in zip(names, grouped):
         nan_col = dframe.columns[dframe.isna().any()].tolist()
@@ -324,7 +335,9 @@ def print_results(research, names, types_var, cross_val=None, draw_dict=None,
             values = []
             for i in range(np.max(dfm['repetition']) + 1):
                 rep_val = dfm[dfm['repetition'] == i][dtype].values[-n_last:]
-                if len(rep_val) < n_last:
+                if len(rep_val.shape) == 1 and len(rep_val) < n_last:
+                    n_last = len(rep_val)
+                elif len(rep_val) < n_last:
                     rep_val = np.concatenate(rep_val)
                 values.append(np.nanmean(rep_val) if none else np.mean(rep_val))
             printed[param][name] = np.mean(values)
