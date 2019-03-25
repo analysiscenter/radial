@@ -14,9 +14,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join('..'))
 
-from .radial.core import RadialBatch
-from .radial.batchflow.models.tf import TFModel
-from .radial.batchflow import Dataset, Pipeline, B
+from radial.core import RadialBatch
+from radial.batchflow.models.tf import TFModel
+from radial.batchflow import Dataset, Pipeline, B
 
 def make_prediction():
     """load data from path, given with argument `-p`.
@@ -26,7 +26,7 @@ def make_prediction():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--path', type=str, help="Path to file with time and derivative of the pressure.",
                         required=True)
-    parser.add_argument('-m', '--model', type=str, help="Path to saved model. Default = ./save_model", default='./saved_model')
+    parser.add_argument('-m', '--model', type=str, help="Path to saved model. Default = ./saved_model", default='./saved_model')
     args = parser.parse_args()
     data = np.load(args.path)
     model_path = args.model
@@ -54,7 +54,6 @@ def predict(time, derivative, model_path):
                      .load(src=(time, derivative), components=['time', 'derivative'])
                      .drop_negative(src=['time', 'derivative'])
                      .drop_outliers(src=['time', 'derivative'])
-                     .to_log10(src=['time', 'derivative'], dst=['time', 'derivative'])
                      .normalize(src=['time', 'derivative'],
                                 dst_range=[None, 'derivative_q'])
                      .get_samples(100, n_samples=1, sampler=np.random.random, src=['time', 'derivative'])
