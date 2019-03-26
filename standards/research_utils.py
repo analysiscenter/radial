@@ -106,9 +106,6 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     cross_val : None or int
         Number of bins in cross valudation split.
     dir_name : str
-In [ ]:
-￼
-
         Name of directory with Researches (availble only when cross validation is used).
     research_name : str
         Name of dir with Research results.
