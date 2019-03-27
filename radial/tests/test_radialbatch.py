@@ -103,7 +103,7 @@ def test_get_samples(setup_batch_loaded): #pylint: disable=redefined-outer-name
     # Act
     batch = batch.get_samples(100, R('beta', a=1, b=1), src=['time', 'derivative'])
     # Assert
-    assert batch.time.shape == (1,)
+    assert batch.time.shape == (2,)
     assert batch.derivative[0].shape == (1, 100)
     assert batch.time[0].shape == (1, 100)
     assert np.all(np.diff(batch.time[0][0]) >= 0)
