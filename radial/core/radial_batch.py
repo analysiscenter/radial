@@ -8,7 +8,7 @@ from sklearn.ensemble import IsolationForest
 
 from . import radial_batch_tools as bt
 from .decorators import init_components
-from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, DatasetIndex, R
+from ..batchflow import Batch, action, inbatch_parallel, any_action_failed, FilesIndex, R
 
 class RadialBatch(Batch):
     """
