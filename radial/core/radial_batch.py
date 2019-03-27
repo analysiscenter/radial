@@ -208,7 +208,7 @@ class RadialBatch(Batch):
     @action
     @init_components
     @inbatch_parallel(init="indices", target="threads")
-    def get_samples(self, index, n_points, n_samples=1, sampler=None, # pylint: disable=too-many-arguments
+    def get_samples(self, index, n_points, sampler=None, # pylint: disable=too-many-arguments
                     src=None, dst=None, interpolate='linear', seed=None, **kwargs):
         """ Draws samples from the interpolation of time and derivative components.
 
@@ -217,14 +217,12 @@ class RadialBatch(Batch):
         range, and calculates values of `derivative` in sampled points.
         Sampler should return values from [0, 1] interval, which later is
         stretched to the range on `time` component. Size of the sample equals
-        `(n_samples, n_points)`.
+        `(1, n_points)`.
 
         Parameters
         ----------
         n_points : int
             Size of a sample.
-        n_samples : int, optional
-            Numper of samples. Defaults to `1`.
         sampler : function or named expression
             Method to sample points within [0, 1] range.
             If callable, it should only take `size` as an argument.
@@ -266,10 +264,10 @@ class RadialBatch(Batch):
                                                bounds_error=True, assume_sorted=True)
 
         if  isinstance(sampler, R):
-            sampler = R(sampler.name, **sampler.kwargs, size=(n_samples, n_points))
+            sampler = R(sampler.name, **sampler.kwargs, size=(1, n_points))
             samples = sampler.get()
         elif callable(sampler):
-            samples = sampler(size=(n_samples, n_points))
+            samples = sampler(size=(1, n_points))
         else:
             raise ValueError("You should specify sampler function!")
 
@@ -281,56 +279,6 @@ class RadialBatch(Batch):
         getattr(self, dst[0])[i] = np.array(sample_times)
         getattr(self, dst[1])[i] = np.array(sample_derivatives)
         return self
-
-    @action
-    def unstack_samples(self):
-        """ Create a new batch in which each element of `time` and `derivative`
-        along axis 0 is considered as a separate signal.
-
-        This method creates a new batch and unstacks components `time` and
-        `derivative`. Then the method updates other components by replication if
-        they are ndarrays of objects. Other types of components will be discarded.
-
-        Returns
-        -------
-        batch : same class as self
-            Batch with split `time` and `derivative` and replicated other components.
-
-        Examples
-        --------
-        >>> batch.time
-        array([array([[ 0,  1,  2,  3],
-                      [ 4,  5,  6,  7],
-                      [ 8,  9, 10, 11]])],
-              dtype=object)
-
-        >>> batch = batch.unstack_signals()
-        >>> batch.time
-        array([array([0, 1, 2, 3]),
-               array([4, 5, 6, 7]),
-               array([ 8,  9, 10, 11])],
-              dtype=object)
-        """
-        n_reps = [sig.shape[0] for sig in self.time]
-
-        # Adding [None] to the list and removing it from resulting
-        # array to make ndarray of arrays
-        time = np.array([sample for observation in self.time
-                         for sample in observation] + [None])[:-1]
-        derivative = np.array([sample for observation in self.derivative
-                               for sample in observation] + [None])[:-1]
-
-        index = DatasetIndex(len(time))
-        batch = type(self)(index)
-        batch.time = time
-        batch.derivative = derivative
-
-        for component_name in set(self.components).intersection({"rig_type", "target"}):
-            component = getattr(self, component_name)
-            val = [elem for elem, n in zip(component, n_reps) for _ in range(n)]
-            val = np.array(val + [None])[:-1]
-            setattr(batch, component_name, val)
-        return batch
 
     @action
     @init_components

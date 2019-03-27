@@ -101,28 +101,10 @@ def test_get_samples(setup_batch_loaded): #pylint: disable=redefined-outer-name
     # Arrange
     batch = setup_batch_loaded
     # Act
-    batch = batch.get_samples(100, 2, R('beta', a=1, b=1), src=['time', 'derivative'])
+    batch = batch.get_samples(100, R('beta', a=1, b=1), src=['time', 'derivative'])
     # Assert
-    assert batch.time.shape == (2,)
-    assert batch.derivative[0].shape == (2, 100)
-    assert batch.time[0].shape == (2, 100)
+    assert batch.time.shape == (1,)
+    assert batch.derivative[0].shape == (1, 100)
+    assert batch.time[0].shape == (1, 100)
     assert np.all(np.diff(batch.time[0][0]) >= 0)
-    assert batch.time.shape == batch.target.shape
-
-def test_unstack_samples(setup_batch_loaded): #pylint: disable=redefined-outer-name
-    """
-    Test method for unstacking samples with generation of
-    new batch.
-    """
-    # Arrange
-    batch = setup_batch_loaded
-    # Act
-    batch = (batch
-             .get_samples(100, 2, R('beta', a=1, b=1), src=['time', 'derivative'])
-             .unstack_samples()
-            )
-    # Assert
-    assert batch.time.shape == (4,)
-    assert batch.derivative[0].shape == (100,)
-    assert np.all(np.diff(batch.time[0]) >= 0)
     assert batch.time.shape == batch.target.shape

@@ -56,7 +56,7 @@ def predict(time, derivative, model_path):
                      .drop_outliers(src=['time', 'derivative'])
                      .normalize(src=['time', 'derivative'],
                                 dst_range=[None, 'derivative_q'])
-                     .get_samples(100, n_samples=1, sampler=np.random.random, src=['time', 'derivative'])
+                     .get_samples(100, sampler=np.random.random, src=['time', 'derivative'])
                      .make_points(src=['time', 'derivative'], dst=['points'])
                      )
     test_pipeline = prep_pipeline + (Pipeline()
