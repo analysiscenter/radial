@@ -1,4 +1,5 @@
-"""File with function that takes log10 time and log10 of the derivative of the pressure and reutrns log10 point of exit to radial mode.
+"""File with function that takes log10 time and log10 of the derivative of the
+pressure and reutrns log10 point of exit to radial mode.
 
 BASIC USAGE:
 foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
@@ -26,7 +27,8 @@ def make_prediction():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--path', type=str, help="Path to file with time and derivative of the pressure.",
                         required=True)
-    parser.add_argument('-m', '--model', type=str, help="Path to saved model. Default = ./saved_model", default='./saved_model')
+    parser.add_argument('-m', '--model', type=str, help="Path to saved model. Default = ./saved_model",
+                        default='./saved_model')
     args = parser.parse_args()
     data = np.load(args.path)
     model_path = args.model
@@ -41,6 +43,8 @@ def predict(time, derivative, model_path):
         log 10 time values
     derivative : numpy array
         log 10 derivative values
+    model_path : str
+        path to model
 
     Returns
     -------
@@ -49,7 +53,7 @@ def predict(time, derivative, model_path):
     time = np.array([time] + [None])[:-1]
     derivative = np.array([derivative] + [None])[:-1]
 
-    ds = Dataset(index=1, batch_class=RadialBatch)
+    dataset = Dataset(index=1, batch_class=RadialBatch)
     prep_pipeline = (Pipeline()
                      .load(src=(time, derivative), components=['time', 'derivative'])
                      .drop_negative(src=['time', 'derivative'])
@@ -58,7 +62,7 @@ def predict(time, derivative, model_path):
                                 dst_range=[None, 'derivative_q'])
                      .get_samples(100, sampler=np.random.random, src=['time', 'derivative'])
                      .make_points(src=['time', 'derivative'], dst=['points'])
-                     )
+                    )
     test_pipeline = prep_pipeline + (Pipeline()
                                      .init_variable('predictions', init_on_each_run=list)
                                      .init_model('dynamic', TFModel, 'model',
@@ -73,7 +77,7 @@ def predict(time, derivative, model_path):
                                      .denormalize(src=['predictions'],
                                                   src_range=['derivative_q'])
                                      .update_variable('predictions', B('predictions'), mode='e')
-                                     ) << ds
+                                    ) << dataset
     test_pipeline.run(1, n_epochs=10)
     return np.mean(np.array(test_pipeline.get_variable('predictions')))
 

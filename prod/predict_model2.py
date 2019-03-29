@@ -1,4 +1,5 @@
-"""File with function that takes log10 time and log10 of the derivative of the pressure and reutrns log10 point of exit to radial mode. """
+"""File with function that takes log10 time and log10 of
+the derivative of the pressure and reutrns log10 point of exit to radial mode. """
 import os
 import sys
 
@@ -22,15 +23,33 @@ def make_prediction():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--path', type=str, help="Path to file with time and derivative of the pressure.",
                         required=True)
+    parser.add_argument('-m', '--model', type=str, help="Path to saved model. Default = ./saved_model",
+                        default='./saved_model')
     args = parser.parse_args()
     data = np.load(args.path)
-    return predict(data[0], data[1])
+    model_path = args.model
+    return predict(data[0], data[1], model_path)
 
-def predict(time, derivative):
+def predict(time, derivative, model_path):
+    """Make a prediction using loaded model
+
+    Parameters
+    ----------
+    time : numpy array
+        log 10 time values
+    derivative : numpy array
+        log 10 derivative values
+    model_path : str
+        path to model
+
+    Returns
+    -------
+        : radial mode point
+    """
     time = np.array([time] + [None])[:-1]
     derivative = np.array([derivative] + [None])[:-1]
 
-    ds = Dataset(index=1, batch_class=RadialBatch)
+    dataset = Dataset(index=1, batch_class=RadialBatch)
     prep_pipeline = (Pipeline()
                         .init_variable('loss_history_dict', init_on_each_run=0)
                         .hard_negative_sampling(statistics_name='loss_history_dict', fraction=0.33)
@@ -46,7 +65,7 @@ def predict(time, derivative):
     test_pipeline = prep_pipeline + (Pipeline()
                         .init_variable('predictions', init_on_each_run=list)
                         .init_model('dynamic', TFModel, 'model',
-                                     config={'load' : {'path' : './../standards/saved_model/'},
+                                     config={'load' : {'path' : model_path},
                                              'build': False})
                         .predict_model('model', fetches='predictions',
                                        feed_dict={'signals': B('derivative_grid')},
@@ -55,7 +74,7 @@ def predict(time, derivative):
                         .denormalize(src='predictions', dst='denorm_predictions',
                                      src_range='derivative_range')
                         .update_variable('predictions', B('denorm_predictions'), mode='e')
-    ) << ds
+    ) << dataset
     test_pipeline.run(1, n_epochs=1)
     return test_pipeline.get_variable('predictions')
 
