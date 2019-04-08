@@ -6,7 +6,20 @@ from ..batchflow.models.tf import TFModel # pylint: disable=no-name-in-module, i
 
 
 def create_preprocess_pipeline(n_samples, sampler=None):
-    """ create pipeline for preprocess model"""
+    """Create pipeline for preprocess model.
+
+    Parameters
+    ----------
+    n_samples : int
+        Size of a sample.
+    sampler : function or named expression
+        Method to sample points within [0, 1] range.
+        If callable, it should only take `size` as an argument.
+
+    Returns
+    -------
+        : Batchflow pipeline
+    """
     if sampler is None:
         sampler = np.random.random
     pipeline = (Pipeline()
@@ -24,7 +37,23 @@ def create_preprocess_pipeline(n_samples, sampler=None):
     return pipeline
 
 def create_train_pipeline(model, model_config, prep=None, **kwargs):
-    """ create pipeline for model training """
+    """Create pipeline for model training.
+
+    Parameters
+    ----------
+    model : Tensorflow model
+        Model for training.
+    model_config : dict
+        Dict with model parameters.
+    prep : None or Pipeline
+        If None then preprocessing pipeline will be created with default patameters.
+        (n_samples = 100, sampler=np.random.random)
+    kwargs : dict
+        Parameters for preprocessing pipeline.
+
+    Returns
+        : Batchflow pipeline.
+    """
     if prep is None:
         n_samples = kwargs.get('n_samples', 100)
         sampler = kwargs.get('sampler', None)
@@ -40,7 +69,24 @@ def create_train_pipeline(model, model_config, prep=None, **kwargs):
     return pipeline
 
 def create_predict_pipeline(prep=None, load_model=None, **kwargs):
-    """create pipeline for model prediction"""
+    """Create pipeline for model prediction.
+
+    Parameters
+    ----------
+    prep : None or Pipeline
+        If None then preprocessing pipeline will be created with default patameters.
+        (n_samples = 100, sampler=np.random.random)
+
+    load_model : str or Pipeline
+        if 'str' than model will be loaded from following path.
+        else model will be loaded from given pipeline.
+    kwargs : dict
+        Parameters for preprocessing pipeline.
+
+    Returns
+    -------
+        : Batchflow pipeline.
+    """
     if prep is None:
         n_samples = kwargs.get('n_samples', 50)
         sampler = kwargs.get('sampler', None)
