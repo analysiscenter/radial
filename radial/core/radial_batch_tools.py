@@ -126,8 +126,10 @@ def draw_predictions(results, names, path=None):
         ax[i].axhline(np.log10(val['target']), ls='--', c='g', lw=1, alpha=0.6, label='target')
         ax[i].axhline(np.mean(results[name]['pred']), ls='--', c='b', lw=1, alpha=0.6, label='pred')
         ax[i].set_title('ape: {:.3} name: {}'.format(ape * 100, name))
+        ax[i].set_xlabel('log time')
+        ax[i].set_ylabel('log derivative')
         ax[i].legend()
-        plt.subplots_adjust(wspace=0.1, hspace=0.3)
+        plt.subplots_adjust(wspace=0.2, hspace=0.4)
     plt.show()
 
 def calculate_results(pipeline):
@@ -164,28 +166,3 @@ def calculate_results(pipeline):
     sorted_ix = np.argsort(diff)
     names = np.array(names)[sorted_ix]
     return results, names
-
-def draw_results(btch, metrics, start=1):
-    """ Plot log data with target and predictions.
-
-    Parameters
-    ----------
-    btch : RadialBatch
-        predicted batch
-    metrics : np.array
-        array with metrics corresponding to every element of the batch.
-    start : int
-        first index to draw results from in the sorted batch.
-    """
-    _, ax = plt.subplots(4, 3, figsize=(20, 12))
-    ax = ax.reshape(-1)
-    ix = np.argsort(metrics)
-    for i in range(start, start+12):
-        ax[i-start].scatter(btch.log_time[ix][-i], btch.log_derivative[ix][-i], c='r')
-        ax[i-start].hlines(btch.log_target[ix][-i],
-                           np.min(btch.log_time[ix][-i]),
-                           np.max(btch.log_time[ix][-i]), colors='g',
-                           linestyle='-')
-        ax[i-start].hlines(btch.denorm_predictions[ix][-i], np.min(btch.log_time[ix][-i]),
-                           np.max(btch.log_time[ix][-i]), colors='b', linestyle='-')
-        ax[i-start].set_title('ape={0:.2f}, idx={1}'.format(metrics[ix][-i], btch.indices[ix][-i]))
