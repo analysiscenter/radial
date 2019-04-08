@@ -227,8 +227,7 @@ def _prepare_results(research, hue=None, cross_val=False, aggr=False, iter_start
 def draw_history(research, names, types_var, cross_val=None, aggr=False,
                  iter_start=0, draw_dict=None): # pylint: disable=too-many-locals,too-many-arguments
     """Draw plot with history of changes of function named `names` with values from
-    column 'types_var'. If cross validation is used, parameter `hue` allows to change
-    the name in legend.
+    column 'types_var'.
 
     Parameters
     ----------
