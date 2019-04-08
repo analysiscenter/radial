@@ -24,7 +24,7 @@ def create_preprocess_pipeline(n_samples, sampler=None):
     return pipeline
 
 def create_train_pipeline(model, model_config, prep=None, **kwargs):
-    """crete pipeline for model training """
+    """ create pipeline for model training """
     if prep is None:
         n_samples = kwargs.get('n_samples', 100)
         sampler = kwargs.get('sampler', None)
