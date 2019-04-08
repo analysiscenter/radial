@@ -16,7 +16,7 @@ def create_preprocess_pipeline(n_samples, sampler=None):
                 .normalize(src=['time', 'derivative', 'target'],
                            src_range=[None, None, 'derivative_q'],
                            dst_range=[None, 'derivative_q', None])
-                .get_samples(n_samples, sampler=np.random.random,
+                .get_samples(n_samples, sampler=sampler,
                              src=['time', 'derivative'])
                 .make_points(src=['time', 'derivative'], dst=['points'])
                 .make_target(src='target')
