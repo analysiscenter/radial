@@ -55,7 +55,6 @@ def predict(time, derivative, model_path):
                         .hard_negative_sampling(statistics_name='loss_history_dict', fraction=0.33)
                         .load(src=(time, derivative), components=['time', 'derivative'])
                         .drop_negative(src=['time', 'derivative'])
-                        .apply_transform(log, src=['time', 'derivative'])
                         .normalize(src=['time', 'derivative'], \
                                    dst_range=[None, 'derivative_range'])
                         .make_grid_data(src=['time', 'derivative'], dst=['log_norm_time_grid', 'log_norm_derivative_grid'],

@@ -99,11 +99,6 @@ def load_npz(path=None, components=None, *args, **kwargs):
 
     return [data[comp] for comp in components]
 
-def log(*args):
-    """ Compute logarithm for apply transoform method """
-    return np.array(list(map(np.log10, args)))
-
-
 def draw_predictions(results, names, path=None):
     """Draw a predictions on real data.
 
