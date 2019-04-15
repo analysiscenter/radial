@@ -163,6 +163,14 @@ class RadialBatch(Batch):
         """ Leaves only positive values of derivative. src should be a list with
         two components name. First component must contain time values, second - derivative.
 
+        Parameters
+        ----------
+        src : list of str len 2, optional
+            list with components name where the first component name is a component with
+            time, second with derivative.
+        dst : list of str len 2, optional
+            list with components name to put the result in the same order as src.
+
         Raises
         ------
         ValueError
@@ -187,10 +195,16 @@ class RadialBatch(Batch):
     def drop_outliers(self, index, contam=0.1, src=None, dst=None, **kwargs):
         """Drop outliers using Isolation Forest algorithm. src should be a list with
         two components name. First component must contain time values, second - derivative.
+
         Parameters
         ----------
         contam : float (from 0 to 0.5)
-            The amount of contamination of the data set
+            The amount of contamination of the data set.
+        src : list of str len 2, optional
+            list with components name where the first component name is a component with
+            time, second with derivative.
+        dst : list of str len 2, optional
+            list with components name to put the result in the same order as src.
         """
         _ = kwargs
         i = self.get_pos(None, src[0], index)
@@ -226,6 +240,11 @@ class RadialBatch(Batch):
         sampler : function or named expression
             Method to sample points within [0, 1] range.
             If callable, it should only take `size` as an argument.
+        src : list of str len 2, optional
+            list with components name where the first component name is a component with
+            time, second with derivative.
+        dst : list of str len 2, optional
+            list with components name to put the result in the same order as src.
         interpolate : str, optional
             Specifies the kind of interpolation as a string
             ('linear', 'nearest', 'zero', 'slinear', 'quadratic', 'cubic',
@@ -283,7 +302,16 @@ class RadialBatch(Batch):
     @action
     @init_components
     def make_points(self, src=None, dst=None, **kwargs):
-        """ Generated new component with name `dst` with value from `src`."""
+        """ Generated new component with name `dst` with value from `src`.
+
+        Parameters
+        ----------
+        src : list of str len 2, optional
+            list with component' name where the first component name is a component with
+            time, second with derivative.
+        dst : str, optional
+            component' name to put data.
+        """
         _ = kwargs
         points = []
         for comp in src:
@@ -309,9 +337,11 @@ class RadialBatch(Batch):
         Parameters
         ----------
         src : list of either str or None
-            Contains names of batch component(s) to be normalized
+            Contains names of batch component(s) to be normalized. First component name is a
+            component with time, second with derivative.
         dst : list of either str or None
-            Contains names of batch component(s) where normalized components will be stored.
+            Contains names of batch component(s) where normalized components will be stored
+            in the same order as src..
         dst_range : list of either str or None
             Contains names of batch component(s) where range of normalized componentes will
             be stored.
