@@ -15,7 +15,7 @@ def setup_batch(request):
     creates initial index object.
     """
     path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data')
-    files = ["rr_1.npz", "sg_1.npz"]
+    files = ["rr_0.npz", "rr_1.npz"]
 
     if np.all([os.path.isfile(os.path.join(path, file)) for file in files]):
         ind = bf.FilesIndex(path=os.path.join(path, '*.npz'), sort=True)
@@ -37,7 +37,7 @@ def setup_batch_loaded(request, setup_batch): #pylint: disable=redefined-outer-n
     Fixture to setup module. Creates initial batch object.
     """
     batch = setup_batch[0]
-    batch = batch.load(fmt="npz", components=["time", "derivative", "rig_type", "target"])
+    batch = batch.load(fmt="npz", components=["time", "derivative", "target"])
 
     def teardown_batch_loaded():
         """
@@ -54,17 +54,14 @@ def test_load(setup_batch): #pylint: disable=redefined-outer-name
     # Arrange
     batch = setup_batch[0]
     # Act
-    batch = batch.load(fmt="npz", components=["time", "derivative", "rig_type", "target"])
+    batch = batch.load(fmt="npz", components=["time", "derivative", "target"])
     # Assert
     assert isinstance(batch.time, np.ndarray)
     assert isinstance(batch.derivative, np.ndarray)
-    assert isinstance(batch.rig_type, np.ndarray)
     assert isinstance(batch.target, np.ndarray)
     assert batch.time.shape == (2,)
-    assert batch.rig_type.shape == (2,)
     assert batch.target.shape == (2,)
     assert isinstance(batch.derivative[0], np.ndarray)
-    assert isinstance(batch.rig_type[0], str)
     del batch
 
 def test_drop_negative(setup_batch_loaded): #pylint: disable=redefined-outer-name
