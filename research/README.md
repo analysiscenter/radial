@@ -7,3 +7,4 @@ Catalog description:
 * [parameters_estimation_2d_model.ipynb](./parameters_estimation_2d_model.ipynb) - parameters estimation for second type of model
 * [training_1d_model.ipynb](./training_1d_model.ipynb) - an example of training and prediction of the first model
 * [training_2d_model.ipynb](./training_2d_model.ipynb) - an example of training and prediction of the second model.
+* [basic_usage.ipynb](./basic_usage.ipynb) - description of overall process from preprocessing to evaluation

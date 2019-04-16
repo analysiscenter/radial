@@ -166,11 +166,11 @@ Or if you want to use a console. Run following command inside prod directory.
 foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
 ```
 
-Process from preprocessing to prediction is described in this [notebook](./research/whole_process.ipynb).
+Process from preprocessing to prediction is described in this [notebook](./research/basic_usage.ipynb).
 
 ## Model evaluation
 
-The detailed description of parameters and models estimation is written in this [notebook](./standards/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 10 times.
+The detailed description of parameters and models estimation is written in this [notebook](./research/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 10 times.
 
 MAPE < 30 % | STD
 ------------ | -------------
