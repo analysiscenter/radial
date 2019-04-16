@@ -72,6 +72,33 @@ foo@bar:~$ python drop_outliers.py -l path/to/npz_TEST_data path/to/npz_TRAIN_da
 Done!
 ```
 
+## Model description
+
+The model used is a small variation of ResNet architecture. The model consists of initial block followed by 3 standard ResNet blocks. Initial block can be described as `cnap`, ResNet blocks can be described as `Rcnacna+`, where:
+
+* R - start residual connection
+* c - convolution operation
+* n - batch normalization
+* a - activation function
+* p - max pooling operation
+* \+ - end residual connection with summation
+
+Initial block parameters:
+
+* number of filters: 64,
+* kernel_size: 7,
+* strides: 2,
+* pool_size=3,
+* pool_strides=2
+
+Block parameters:
+
+* number of filters: [4, 8, 16] for all convolutions in each of three blocks
+* first convolution of each block has strides = 2, others have strides = 1
+* actiavtion = tf.relu
+* kernel_size = 3
+* padding = 'same'
+
 ### Train model
 
 Here is an example of a pipeline that loads data, makes preprocessing and trains a model for 100 epochs:
@@ -139,11 +166,11 @@ Or if you want to use a console. Run following command inside prod directory.
 foo@bar:~$ python predict.py -p ./path/to/data.npy -m /path/to/model (optional)
 ```
 
-Process from preprocessing to prediction is described in this [notebook](./research/whole_process.ipynb).
+Process from preprocessing to prediction is described in this [notebook](./research/basic_usage.ipynb).
 
 ## Model evaluation
 
-The detailed description of parameters and models estimation is written in this [notebook](./standards/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 10 times.
+The detailed description of parameters and models estimation is written in this [notebook](./research/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 10 times.
 
 MAPE < 30 % | STD
 ------------ | -------------

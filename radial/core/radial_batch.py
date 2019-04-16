@@ -31,11 +31,10 @@ class RadialBatch(Batch):
         super().__init__(index, preloaded)
         self.time = self.array_of_nones
         self.derivative = self.array_of_nones
-        self.rig_type = self.array_of_nones
         self.target = self.array_of_nones
         self.predictions = self.array_of_nones
 
-    components = "time", "derivative", "rig_type", "target"
+    components = "time", "derivative", "target"
 
     @property
     def array_of_nones(self):
@@ -151,7 +150,7 @@ class RadialBatch(Batch):
             components = self.components
         for comp, data in zip(components, zip(*results)):
             data = np.array(data + (None,))[:-1]
-            if comp in ['rig_type', 'target']:
+            if comp == 'target':
                 data = np.array([d for d in data])
             setattr(self, comp, data)
         return self

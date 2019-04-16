@@ -53,7 +53,6 @@ def xls_to_npz(path_from, path_to):
             np.savez(os.path.join(path_to, 'rr_{}'.format(shnum)),
                      time=np.array([val for val in sheet.col_values(0)[2:] if val != '']),
                      derivative=np.array([val for val in sheet.col_values(2)[2:] if val != '']),
-                     rig_type=sheet.col_values(4)[2],
                      target=sheet.col_values(6)[2])
     else:
         save_path = []
@@ -70,7 +69,6 @@ def xls_to_npz(path_from, path_to):
                 np.savez(os.path.join(save_path[num_p], 'rr_{}'.format(i)),
                          time=np.array([val for val in sheet.col_values(0)[2:] if val != '']),
                          derivative=np.array([val for val in sheet.col_values(2)[2:] if val != '']),
-                         rig_type=sheet.col_values(4)[2],
                          target=sheet.col_values(6)[2])
                 i += 1
     print('Done!')
