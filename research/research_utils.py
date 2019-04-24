@@ -86,7 +86,7 @@ def _update_research(research, pipeline, name, dataset):
 
 def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps,
                              n_iters, cross_val=None, dir_name='research_cv', research_name='research',
-                             train_name='train', test_name='test'): # pylint: disable=too-many-arguments, too-many-locals
+                             train_name='train', test_name='test', **kwargs): # pylint: disable=too-many-arguments, too-many-locals
     """Execute research with given parameters.
 
     Parameters
@@ -120,10 +120,14 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     """
     # simple Research run without cross validation
     research = deepcopy(res)
+    workers = kwargs.get('workers', 1)
+    gpu = kwargs.get('gpu', None)
+
     if not isinstance(dataset, list):
         research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset.train, dataset.test])
-        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name, progress_bar=True)
+        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name, progress_bar=True,
+                     workers=workers, gpu=gpu)
         return research
 
     # creation directiory to save cross validation Resutls
@@ -147,7 +151,8 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
         research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset[i][0], dataset[i][1]])
         research_name_cv = './%s/' % dir_name + research_name + '_cv_%d' % i
-        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name_cv, progress_bar=True)
+        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name_cv, progress_bar=True,
+                     workers=workers, gpu=gpu)
         research_list.append(research)
     return research_list
 
@@ -177,17 +182,21 @@ def split_df_by_name(dataframe, parameters, draw_dict=None):
             if dataframe.empty:
                 raise ValueError("Incorrect column name {} or value {}.".format(key, value))
     for names, name_df in dataframe.groupby('name'):
-        new_df = pd.DataFrame()
-        for param_names, values in name_df.groupby(parameters):
-            values['parameters'] = str(param_names).replace("'", "")
-            new_df = new_df.append(values)
+        if len(parameters) != 0:
+            new_df = pd.DataFrame()
+            for param_names, values in name_df.groupby(parameters):
+                values['parameters'] = str(param_names).replace("'", "")
+                new_df = new_df.append(values)
+        else:
+            new_df = name_df.copy()
+            new_df['parameters'] = 'None'
         all_names[names] = new_df
     return all_names
 
 def _load_research(research):
     if not isinstance(research, str):
         return research.load_results()
-    return Research().load(research).load_results(as_dataframe=True, use_alias=False)
+    return Research().load(research).load_results(use_alias=False)
 
 def _get_parameters(research):
     if isinstance(research, str):
@@ -260,7 +269,7 @@ def draw_history(research, names, types_var, cross_val=None, aggr=False,
                 dtype = dtp
                 break
         dframe[dtype] = dframe[dtype].astype(float)
-        graph = sns.FacetGrid(dframe, col='parameters', height=5, hue=hue)
+        graph = sns.FacetGrid(dframe, col='parameters', height=5, hue=hue, col_wrap=5)
         graph.fig.suptitle(dtype + '/' + name, fontsize=16, y=1.05)
         graph.map(sns.lineplot, 'iteration', dtype).add_legend()
         plt.show()
@@ -293,15 +302,13 @@ def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
     plt.legend()
     plt.show()
 
-def print_results(research, names, types_var, cross_val=None, draw_dict=None,
-                  n_last=100, none=False): # pylint: disable=too-many-locals,too-many-arguments
+def print_results_cv(research, names, types_var, cross_val=None, draw_dict=None,
+                     n_last=100, none=False, sort_by=None, hue='number_of_cv'): # pylint: disable=too-many-locals,too-many-arguments
     """Print table with mean values of 'names' columns from 'n_last' iterations.
-    NOTE : Works incorrect with cross validation directories.
 
     Parameters
     ----------
     research : Research
-
     names : str or list of str
         Names of functions from Research.
     type_var : str or list of str
@@ -317,29 +324,104 @@ def print_results(research, names, types_var, cross_val=None, draw_dict=None,
     none : bool
         If True, than none values will be ignored,
         else if any none in column appeared, than mean value of its column will be none.
+    sort_by : str
+        Name of the column for sort.
+    hue : str or None, optional
+        Name of different cross validation.
+
+    Returns
+    -------
+        : list of DataFrame
+        Each DataFrame consists results with given name.
     """
-    grouped = _prepare_results(research, None, cross_val, False, 0, draw_dict, names)
-    printed = defaultdict(lambda: defaultdict(dict))
+    grouped = _prepare_results(research, hue, cross_val, False, 0, draw_dict, names)
+    statistics_df = []
     for name, dframe in zip(names, grouped):
+        global_stats = []
         nan_col = dframe.columns[dframe.isna().any()].tolist()
         dtype = types_var[0]
         for dtp in types_var:
             if dtp not in nan_col:
                 dtype = dtp
                 break
+        max_iter = dframe['iteration'].max()
+        dframe = dframe[dframe['iteration'] >= max_iter - n_last]
         for param, dfm in dframe.groupby('parameters'):
-            values = []
-            for i in range(np.max(dfm['repetition']) + 1):
-                rep_val = dfm[dfm['repetition'] == i][dtype].values[-n_last:]
-                if len(rep_val.shape) == 1 and len(rep_val) < n_last:
-                    n_last = len(rep_val)
-                elif len(rep_val) < n_last:
-                    rep_val = np.concatenate(rep_val)
-                values.append(np.nanmean(rep_val) if none else np.mean(rep_val))
-            printed[param][name] = np.mean(values)
-            printed[param][name + ' std'] = np.std(values)
-    val = []
-    col = ['params'] + list(list(printed.items())[0][1].keys())
-    for key, val_dict in printed.items():
-        val.append([key] + list(val_dict.values()))
-    print(tabulate(val, col, tablefmt='fancy_grid'))
+            par_mean = []
+            for cv, cv_df in dfm.groupby(hue):
+                cv_mean = []
+                for i in range(np.max(cv_df['repetition']) + 1):
+                    rep_val = cv_df[cv_df['repetition'] == i][dtype]
+                    if len(rep_val.shape) == 1 and len(rep_val) < n_last:
+                        n_last = len(rep_val)
+                    elif len(rep_val) < n_last:
+                        rep_val = np.concatenate(rep_val)
+                    cv_mean.append(np.nanmean(np.array(rep_val).astype(np.float32))
+                                   if none else np.mean(rep_val))
+                par_mean.append(np.mean(cv_mean))
+            global_stats.append([*par_mean, np.mean(par_mean), np.std(par_mean)])
+
+        columns = []
+        for name in names:
+            for cv in range(cross_val):
+                columns.append(name + "_" + str(cv))
+            columns.extend([name + "_mean", name + "_std"])
+        printed = pd.DataFrame(data=global_stats, index=dframe["parameters"].unique(),
+                               columns=columns)
+        statistics_df.append(printed.sort_values(by=sort_by, ascending=False))
+    return statistics_df
+
+def print_results_research(df, name, type_var, average_repetitions=False, sort_by=None, ascending=True,
+                           n_last=100):
+    """ Show results given by research dataframe.
+    Parameters
+    ----------
+    df : DataFrame
+        Research's results
+    layout : str
+        string where each element consists two parts that splited by /. First part is the type
+        of calculated value wrote in the "name" column. Second is name of column  with the parameters
+        that will be drawn.
+    average_repetitions : bool, optional
+        If True, then a separate values will be written
+        else one mean value will be written.
+    sort_by : str or None, optional
+        If not None, column's name to sort.
+    ascending : bool, None
+        Same as in ```pd.sort_value```.
+    n_last : int, optional
+        The number of iterations at the end of which the averaging takes place.
+    Returns
+    -------
+        : DataFrame
+        Research results in DataFrame, where indices is a config parameters and colums is `layout` values
+    """
+    columns = []
+    data = []
+    index = []
+    ndf = df[df['name'] == name]
+    if average_repetitions:
+        columns.extend([name + '_mean', name + '_std'])
+    else:
+        columns.extend([name + '_' + str(i) for i in [*ndf['repetition'].unique(), 'mean', 'std']])
+    for config, cdf in ndf.groupby("config"):
+        index.append(config)
+        cdf = cdf.drop(['config', 'name'], axis=1).dropna(axis=1).astype('float')
+        if average_repetitions:
+            idf = cdf.groupby('iteration').mean().drop('repetition', axis=1)
+            max_iter = idf.index.max()
+            idf = idf[idf.index > max_iter - n_last]
+            data.append([idf[type_var].mean(), idf[type_var].std()])
+        else:
+            rep = []
+            for _, rdf in cdf.groupby('repetition'):
+                rdf = rdf.drop('repetition', axis=1)
+                max_iter = rdf['iteration'].max()
+                rdf = rdf[rdf['iteration'] > max_iter - n_last]
+                rep.append(rdf[type_var].mean())
+            data.append([*rep, np.mean(rep), np.std(rep)])
+
+    res_df = pd.DataFrame(data=data, index=index, columns=columns)
+    if sort_by:
+        res_df.sort_values(by=sort_by, ascending=ascending, inplace=True)
+    return res_df
