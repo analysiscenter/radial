@@ -174,7 +174,7 @@ The detailed description of parameters and models estimation is written in this 
 
 MAPE < 30 % | STD
 ------------ | -------------
-91.932 | 0.564
+96.52 | 0.3086
 
 And the histogram of distribution of percentage error:
 
