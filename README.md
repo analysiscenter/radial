@@ -170,7 +170,7 @@ Process from preprocessing to prediction is described in this [notebook](./resea
 
 ## Model evaluation
 
-The detailed description of parameters and models estimation is written in this [notebook](./research/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 10 times.
+The detailed description of parameters and models estimation is written in this [notebook](./research/model_description.ipynb). The evaluation of best model is presented below. To estimate std we re-train model 20 times.
 
 MAPE < 30 % | STD
 ------------ | -------------
@@ -178,7 +178,7 @@ MAPE < 30 % | STD
 
 And the histogram of distribution of percentage error:
 
-<img src="./images/distribution_of_ae.png" alt="drawing" width="520"/>
+<img src="./images/dist_of_ae.png" alt="drawing" width="520"/>
 
 ## Installation
 
