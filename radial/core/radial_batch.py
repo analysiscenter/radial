@@ -27,8 +27,8 @@ class RadialBatch(Batch):
     index : DatasetIndex
         Unique identifiers of rig data in the batch.
     """
-    def __init__(self, index, preloaded=None):
-        super().__init__(index, preloaded)
+    def __init__(self, index, *args, preloaded=None, **kwargs):
+        super().__init__(index, preloaded, *args, **kwargs)
         self.time = self.array_of_nones
         self.derivative = self.array_of_nones
         self.target = self.array_of_nones
