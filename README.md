@@ -85,15 +85,15 @@ The model used is a small variation of ResNet architecture. The model consists o
 
 Initial block parameters:
 
-* number of filters: 64,
+* number of filters: 8,
 * kernel_size: 7,
 * strides: 2,
-* pool_size=3,
-* pool_strides=2
+* pool_size: 3,
+* pool_strides: 2
 
 Block parameters:
 
-* number of filters: [4, 8, 16] for all convolutions in each of three blocks
+* number of filters: [2, 4, 8] for all convolutions in each of three blocks
 * first convolution of each block has strides = 2, others have strides = 1
 * actiavtion = tf.relu
 * kernel_size = 3
