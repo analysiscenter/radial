@@ -198,8 +198,8 @@ Please cite Radial in your publications if it helps your research.
     of finding exit point to the radial mode. 2019.
 
 ```
-@misc{radial_2019_1156085,
-  author       = {Khudorozhkov R., Broilovskiy A., Mylzenova D., Podvyaznikov D.},
+@misc{radial_2019,
+  author       = {R. Khudorozhkov and A. Broilovskiy and D. Mylzenova and D. Podvyaznikov},
   title        = {Radial library for deep research of finding exit point to the radial mode},
   year         = 2019
 }
