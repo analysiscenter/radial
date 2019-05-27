@@ -78,7 +78,7 @@ def _update_research(research, pipeline, name, dataset):
     for i, ppl in enumerate(pipeline):
         executable = Executable()
         old_exec = research.executables[name[i]]
-        executable.add_pipeline(ppl<<dataset[i], name=name[i], branch_pipeline=None, variables=old_exec.variables,
+        executable.add_pipeline(ppl<<dataset[i], name=name[i], variables=old_exec.variables,
                                 execute=old_exec.execute, dump=old_exec.dump, run=old_exec.to_run,
                                 logging=old_exec.logging, **old_exec.kwargs)
         research.executables[name[i]] = executable
@@ -124,9 +124,10 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     gpu = kwargs.get('gpu', None)
 
     if not isinstance(dataset, list):
+        print('without cv')
         research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset.train, dataset.test])
-        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name, progress_bar=True,
+        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name, bar=True,
                      workers=workers, gpu=gpu)
         return research
 
@@ -151,7 +152,7 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
         research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset[i][0], dataset[i][1]])
         research_name_cv = './%s/' % dir_name + research_name + '_cv_%d' % i
-        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name_cv, progress_bar=True,
+        research.run(n_reps=n_reps, n_iters=n_iters, name=research_name_cv, bar=True,
                      workers=workers, gpu=gpu)
         research_list.append(research)
     return research_list
