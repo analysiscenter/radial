@@ -275,7 +275,7 @@ def draw_history(research, names, types_var, cross_val=None, aggr=False,
         graph.map(sns.lineplot, 'iteration', dtype).add_legend()
         plt.show()
 
-def draw_hisogram(research, names, type_var, cross_val=False, draw_dict=None):
+def draw_histogram(research, names, type_var, cross_val=False, draw_dict=None):
     """Draw historgram of research results by given `name` of function and `type_var`.
 
     Parameters
