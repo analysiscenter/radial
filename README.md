@@ -13,7 +13,7 @@ It allows to:
 
 > Radial is based on [BatchFlow](https://github.com/analysiscenter/batchflow).
 
-Radial has three modules [``core``](https://github.com/analysiscenter/radial/tree/master/radial/core), [``preprocessing``](https://github.com/analysiscenter/radial/tree/master/radial/preprocessing) and [``pipelines``](https://github.com/analysiscenter/radial/tree/master/radial/pipelines).
+Radial has three modules [``core``](./radial/core), [``preprocessing``](./radial/preprocessing) and [``pipelines``](./radial/pipelines).
 
 ``core`` module contains ``RadialBatch`` class. This class includes methods that allows to load, normalize, interpolate and transform input data to feed the model.
 
