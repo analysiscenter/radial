@@ -13,8 +13,8 @@ build:
   ci:
     - pip3 install -U pylint
     - pip3 install -r requirements-shippable.txt
-    - find ./radial -not -path "./radial/dataset/*" -iname "*.py" | xargs -r pylint3 -rn --rcfile pylintrc
-    - python3 -m pytest -v --ignore=./radial/dataset --junitxml=shippable/testresults/pytests.xml
+    - find ./radial -not -path "./radial/batchflow/*" -iname "*.py" | xargs -r pylint -rn --rcfile pylintrc
+    - python3 -m pytest -v --ignore=./radial/batchflow --junitxml=shippable/testresults/pytests.xml
 
 integrations:
   hub:
