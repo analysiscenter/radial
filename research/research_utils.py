@@ -124,7 +124,6 @@ def execute_research_with_cv(train_pipeline, test_pipeline, res, dataset, n_reps
     gpu = kwargs.get('gpu', None)
 
     if not isinstance(dataset, list):
-        print('without cv')
         research = _update_research(research, [train_pipeline, test_pipeline],\
                                    [train_name, test_name], [dataset.train, dataset.test])
         research.run(n_reps=n_reps, n_iters=n_iters, name=research_name, bar=True,
